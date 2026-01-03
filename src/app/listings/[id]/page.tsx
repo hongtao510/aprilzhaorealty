@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { getListing, getListings, formatPrice } from "@/lib/data";
 import { CommentSection } from "@/components/CommentSection";
 
@@ -25,6 +26,15 @@ export default async function ListingPage({
     <div>
       {/* Hero Image */}
       <section className="relative h-[50vh] md:h-[60vh] bg-gradient-to-br from-zinc-300 to-zinc-400">
+        {listing.images[0] && (
+          <Image
+            src={listing.images[0]}
+            alt={listing.address}
+            fill
+            className="object-cover"
+            priority
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
 
         {/* Back button */}
@@ -106,25 +116,95 @@ export default async function ListingPage({
               </p>
             </div>
 
-            {/* Features placeholder */}
-            <div className="mb-12">
-              <h2 className="text-2xl font-bold mb-4">Features</h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {[
-                  "Central Air",
-                  "Hardwood Floors",
-                  "Updated Kitchen",
-                  "2-Car Garage",
-                  "Large Backyard",
-                  "Near Schools",
-                ].map((feature, i) => (
-                  <div key={i} className="flex items-center gap-2 text-zinc-600">
-                    <div className="w-2 h-2 bg-[#b1ff8f] rounded-full" />
-                    {feature}
-                  </div>
-                ))}
+            {/* Property Details */}
+            {(listing.garage || listing.heating || listing.cooling || listing.hoaFees) && (
+              <div className="mb-12">
+                <h2 className="text-2xl font-bold mb-4">Property Details</h2>
+                <div className="grid grid-cols-2 gap-4">
+                  {listing.garage && (
+                    <div>
+                      <p className="text-sm text-zinc-500">Parking</p>
+                      <p className="font-medium">{listing.garage}</p>
+                    </div>
+                  )}
+                  {listing.heating && (
+                    <div>
+                      <p className="text-sm text-zinc-500">Heating</p>
+                      <p className="font-medium">{listing.heating}</p>
+                    </div>
+                  )}
+                  {listing.cooling && (
+                    <div>
+                      <p className="text-sm text-zinc-500">Cooling</p>
+                      <p className="font-medium">{listing.cooling}</p>
+                    </div>
+                  )}
+                  {listing.hoaFees && (
+                    <div>
+                      <p className="text-sm text-zinc-500">HOA Fees</p>
+                      <p className="font-medium">${listing.hoaFees}/month</p>
+                    </div>
+                  )}
+                  {listing.mlsNumber && (
+                    <div>
+                      <p className="text-sm text-zinc-500">MLS #</p>
+                      <p className="font-medium">{listing.mlsNumber}</p>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Features */}
+            {listing.features && listing.features.length > 0 && (
+              <div className="mb-12">
+                <h2 className="text-2xl font-bold mb-4">Features</h2>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {listing.features.map((feature, i) => (
+                    <div key={i} className="flex items-center gap-2 text-zinc-600">
+                      <div className="w-2 h-2 bg-[#b1ff8f] rounded-full" />
+                      {feature}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Appliances */}
+            {listing.appliances && listing.appliances.length > 0 && (
+              <div className="mb-12">
+                <h2 className="text-2xl font-bold mb-4">Appliances</h2>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {listing.appliances.map((appliance, i) => (
+                    <div key={i} className="flex items-center gap-2 text-zinc-600">
+                      <div className="w-2 h-2 bg-[#c181ff] rounded-full" />
+                      {appliance}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Schools */}
+            {listing.schools && (listing.schools.elementary || listing.schools.highSchool) && (
+              <div className="mb-12">
+                <h2 className="text-2xl font-bold mb-4">Schools</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {listing.schools.elementary && (
+                    <div>
+                      <p className="text-sm text-zinc-500">Elementary District</p>
+                      <p className="font-medium">{listing.schools.elementary}</p>
+                    </div>
+                  )}
+                  {listing.schools.highSchool && (
+                    <div>
+                      <p className="text-sm text-zinc-500">High School District</p>
+                      <p className="font-medium">{listing.schools.highSchool}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Comments */}
             <CommentSection listingId={listing.id} />
@@ -167,6 +247,19 @@ export default async function ListingPage({
                   </svg>
                   Share
                 </button>
+                {listing.mlsLink && (
+                  <a
+                    href={listing.mlsLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-3 border-2 border-zinc-200 rounded-xl font-medium hover:border-[#c181ff] transition-colors flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    View on MLS
+                  </a>
+                )}
               </div>
             </div>
           </div>

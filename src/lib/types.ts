@@ -12,6 +12,18 @@ export interface Listing {
   yearBuilt?: number;
   soldDate?: string;
   propertyType?: string;
+  mlsLink?: string;
+  mlsNumber?: string;
+  hoaFees?: number;
+  garage?: string;
+  heating?: string;
+  cooling?: string;
+  features?: string[];
+  appliances?: string[];
+  schools?: {
+    elementary?: string;
+    highSchool?: string;
+  };
 }
 
 export interface Comment {
