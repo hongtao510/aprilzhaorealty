@@ -33,3 +33,12 @@ export interface Comment {
   content: string;
   createdAt: string;
 }
+
+export interface Testimonial {
+  id: string;
+  name: string;
+  email?: string;
+  completedTransaction: boolean;
+  content: string;
+  createdAt: string;
+}
