@@ -51,7 +51,7 @@ export function CommentSection({ listingId }: { listingId: string }) {
   return (
     <div className="pt-12 border-t border-zinc-100">
       <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
-        <span className="w-3 h-3 bg-[#c181ff] rounded-full" />
+        <span className="w-3 h-3 bg-[#86efac] rounded-full" />
         Feedback & Comments
       </h2>
 
@@ -65,7 +65,7 @@ export function CommentSection({ listingId }: { listingId: string }) {
             >
               <div className="flex justify-between items-start mb-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-[#c181ff] to-[#5e74ff] rounded-full flex items-center justify-center text-white font-bold text-sm">
+                  <div className="w-10 h-10 bg-gradient-to-br from-[#86efac] to-[#0d9488] rounded-full flex items-center justify-center text-white font-bold text-sm">
                     {comment.author.charAt(0)}
                   </div>
                   <p className="font-semibold">{comment.author}</p>
@@ -95,7 +95,7 @@ export function CommentSection({ listingId }: { listingId: string }) {
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-3 border-2 border-zinc-200 rounded-xl focus:outline-none focus:border-[#c181ff] transition-colors"
+              className="w-full px-4 py-3 border-2 border-zinc-200 rounded-xl focus:outline-none focus:border-[#86efac] transition-colors"
               placeholder="Jane Doe"
               required
             />
@@ -109,7 +109,7 @@ export function CommentSection({ listingId }: { listingId: string }) {
               value={content}
               onChange={(e) => setContent(e.target.value)}
               rows={4}
-              className="w-full px-4 py-3 border-2 border-zinc-200 rounded-xl focus:outline-none focus:border-[#c181ff] transition-colors resize-none"
+              className="w-full px-4 py-3 border-2 border-zinc-200 rounded-xl focus:outline-none focus:border-[#86efac] transition-colors resize-none"
               placeholder="Share your experience or feedback..."
               required
             />
@@ -117,7 +117,7 @@ export function CommentSection({ listingId }: { listingId: string }) {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="px-6 py-3 bg-[#381b5e] text-white font-semibold rounded-xl hover:bg-[#4a2578] transition-all disabled:opacity-50 hover:shadow-lg hover:shadow-purple-500/25"
+            className="px-6 py-3 bg-[#166534] text-white font-semibold rounded-xl hover:bg-[#14532d] transition-all disabled:opacity-50 hover:shadow-lg hover:shadow-emerald-500/25"
           >
             {isSubmitting ? "Posting..." : "Post Comment"}
           </button>

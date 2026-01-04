@@ -48,13 +48,13 @@ export async function POST(request: NextRequest) {
       subject: `New Contact Form Submission from ${body.name}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #381b5e;">New Contact Form Submission</h2>
+          <h2 style="color: #166534;">New Contact Form Submission</h2>
           <div style="background-color: #f9f9f9; padding: 20px; border-radius: 8px;">
             <p><strong>Name:</strong> ${body.name}</p>
             <p><strong>Email:</strong> <a href="mailto:${body.email}">${body.email}</a></p>
             <p><strong>Phone:</strong> ${body.phone || "Not provided"}</p>
             <p><strong>Message:</strong></p>
-            <p style="background-color: white; padding: 15px; border-radius: 4px; border-left: 4px solid #381b5e;">
+            <p style="background-color: white; padding: 15px; border-radius: 4px; border-left: 4px solid #166534;">
               ${body.message.replace(/\n/g, "<br>")}
             </p>
           </div>

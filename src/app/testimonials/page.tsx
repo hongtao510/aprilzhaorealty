@@ -34,7 +34,13 @@ export default function TestimonialsPage() {
     setIsSubmitting(true);
     setError(null);
 
-    // Simulate submission - in production, this would call an API
+    // Simulate submission - console log since no backend
+    console.log("Feedback Submission:", {
+      ...formData,
+      submittedAt: new Date().toISOString(),
+    });
+
+    // Simulate API delay
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     const newTestimonial: Testimonial = {
@@ -46,10 +52,14 @@ export default function TestimonialsPage() {
       createdAt: new Date().toISOString().split("T")[0],
     };
 
+    // Add to local state (would normally be saved to backend)
     setTestimonials([newTestimonial, ...testimonials]);
     setFormData({ name: "", email: "", completedTransaction: null, content: "" });
     setIsSubmitting(false);
     setSubmitted(true);
+
+    // Show alert confirmation
+    alert(`Thank you for your feedback, ${newTestimonial.name}!\n\nYour testimonial has been submitted.`);
 
     // Reset submitted state after 3 seconds
     setTimeout(() => setSubmitted(false), 3000);
@@ -58,14 +68,39 @@ export default function TestimonialsPage() {
   return (
     <div>
       {/* Hero Section */}
-      <section className="bg-[#381b5e] text-white py-20 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-[#c181ff] rounded-full blur-3xl opacity-20" />
-        <div className="absolute bottom-0 left-0 w-72 h-72 bg-[#5e74ff] rounded-full blur-3xl opacity-15" />
+      <section className="bg-[#166534] text-white py-20 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-[#86efac] rounded-full blur-3xl opacity-20" />
+        <div className="absolute bottom-0 left-0 w-72 h-72 bg-[#0d9488] rounded-full blur-3xl opacity-15" />
         <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <h1 className="text-5xl font-bold mb-4">Client Testimonials</h1>
-          <p className="text-xl text-purple-200 max-w-2xl">
+          <span className="inline-block text-sm font-semibold text-emerald-200 uppercase tracking-wider mb-4">
+            Client Testimonials
+          </span>
+          <h1 className="text-5xl font-bold mb-4">What Our Clients Say</h1>
+          <p className="text-xl text-emerald-100 max-w-2xl">
             Hear from clients who have worked with me on their real estate journey. Your feedback helps me serve you better.
           </p>
+        </div>
+      </section>
+
+      {/* Stats Bar */}
+      <section className="py-8 bg-white border-b border-zinc-100">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex flex-wrap justify-center gap-8 md:gap-16">
+            <div className="text-center">
+              <p className="text-3xl font-bold text-[#166534]">23+</p>
+              <p className="text-sm text-zinc-500">Happy Families</p>
+            </div>
+            <div className="hidden md:block w-px h-12 bg-zinc-200 self-center" />
+            <div className="text-center">
+              <p className="text-3xl font-bold text-[#166534]">5.0</p>
+              <p className="text-sm text-zinc-500">Average Rating</p>
+            </div>
+            <div className="hidden md:block w-px h-12 bg-zinc-200 self-center" />
+            <div className="text-center">
+              <p className="text-3xl font-bold text-[#166534]">100%</p>
+              <p className="text-sm text-zinc-500">Satisfaction</p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -80,14 +115,14 @@ export default function TestimonialsPage() {
               </p>
 
               {submitted && (
-                <div className="mb-6 p-4 bg-[#b1ff8f]/20 border border-[#b1ff8f] rounded-xl">
+                <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-[#b1ff8f] rounded-full flex items-center justify-center">
-                      <svg className="w-4 h-4 text-[#381b5e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="w-8 h-8 bg-[#166534] rounded-full flex items-center justify-center">
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                     </div>
-                    <p className="font-medium text-[#381b5e]">Thank you for your feedback!</p>
+                    <p className="font-medium text-[#166534]">Thank you for your feedback!</p>
                   </div>
                 </div>
               )}
@@ -109,7 +144,7 @@ export default function TestimonialsPage() {
                     id="name"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-4 py-4 border-2 border-zinc-200 rounded-xl text-base focus:outline-none focus:border-[#c181ff] transition-colors"
+                    className="w-full px-4 py-4 border-2 border-zinc-200 rounded-xl text-base focus:outline-none focus:border-[#166534] transition-colors"
                     placeholder="Your name"
                     required
                   />
@@ -124,7 +159,7 @@ export default function TestimonialsPage() {
                     id="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-4 py-4 border-2 border-zinc-200 rounded-xl text-base focus:outline-none focus:border-[#c181ff] transition-colors"
+                    className="w-full px-4 py-4 border-2 border-zinc-200 rounded-xl text-base focus:outline-none focus:border-[#166534] transition-colors"
                     placeholder="you@example.com"
                   />
                 </div>
@@ -139,8 +174,8 @@ export default function TestimonialsPage() {
                       onClick={() => setFormData({ ...formData, completedTransaction: true })}
                       className={`flex-1 py-4 px-6 rounded-xl font-medium border-2 transition-all ${
                         formData.completedTransaction === true
-                          ? "border-[#b1ff8f] bg-[#b1ff8f]/20 text-[#381b5e]"
-                          : "border-zinc-200 hover:border-[#c181ff]"
+                          ? "border-[#166534] bg-emerald-50 text-[#166534]"
+                          : "border-zinc-200 hover:border-[#166534]"
                       }`}
                     >
                       <div className="flex items-center justify-center gap-2">
@@ -155,8 +190,8 @@ export default function TestimonialsPage() {
                       onClick={() => setFormData({ ...formData, completedTransaction: false })}
                       className={`flex-1 py-4 px-6 rounded-xl font-medium border-2 transition-all ${
                         formData.completedTransaction === false
-                          ? "border-[#c181ff] bg-[#c181ff]/20 text-[#381b5e]"
-                          : "border-zinc-200 hover:border-[#c181ff]"
+                          ? "border-[#f59e0b] bg-amber-50 text-[#b45309]"
+                          : "border-zinc-200 hover:border-[#f59e0b]"
                       }`}
                     >
                       <div className="flex items-center justify-center gap-2">
@@ -178,7 +213,7 @@ export default function TestimonialsPage() {
                     value={formData.content}
                     onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                     rows={5}
-                    className="w-full px-4 py-4 border-2 border-zinc-200 rounded-xl text-base focus:outline-none focus:border-[#c181ff] transition-colors resize-none"
+                    className="w-full px-4 py-4 border-2 border-zinc-200 rounded-xl text-base focus:outline-none focus:border-[#166534] transition-colors resize-none"
                     placeholder="Share your experience working with April..."
                     required
                   />
@@ -187,7 +222,7 @@ export default function TestimonialsPage() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full py-4 bg-[#381b5e] text-white font-semibold rounded-xl hover:bg-[#4a2578] transition-all disabled:opacity-50 hover:shadow-lg hover:shadow-purple-500/25"
+                  className="w-full py-4 bg-[#166534] text-white font-semibold rounded-xl hover:bg-[#14532d] transition-all disabled:opacity-50 hover:shadow-lg hover:shadow-emerald-500/25"
                 >
                   {isSubmitting ? "Submitting..." : "Submit Testimonial"}
                 </button>
@@ -206,18 +241,18 @@ export default function TestimonialsPage() {
                 >
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-gradient-to-br from-[#c181ff] to-[#5e74ff] rounded-full flex items-center justify-center text-white font-bold">
+                      <div className="w-12 h-12 bg-gradient-to-br from-[#86efac] to-[#0d9488] rounded-full flex items-center justify-center text-white font-bold">
                         {testimonial.name.charAt(0)}
                       </div>
                       <div>
                         <p className="font-semibold">{testimonial.name}</p>
                         <div className="flex items-center gap-2">
                           {testimonial.completedTransaction ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#b1ff8f]/30 text-[#381b5e] text-xs font-medium rounded-full">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-[#166534] text-xs font-medium rounded-full">
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                               </svg>
-                              Verified Client
+                              Closed with April
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-200 text-zinc-600 text-xs font-medium rounded-full">
@@ -246,7 +281,7 @@ export default function TestimonialsPage() {
           </p>
           <a
             href="/contact"
-            className="inline-block px-8 py-4 bg-[#381b5e] text-white font-semibold rounded-full hover:bg-[#4a2578] transition-all hover:shadow-lg hover:shadow-purple-500/25"
+            className="inline-block px-8 py-4 bg-[#166534] text-white font-semibold rounded-full hover:bg-[#14532d] transition-all hover:shadow-lg hover:shadow-emerald-500/25"
           >
             Get in Touch
           </a>
