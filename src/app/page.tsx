@@ -9,24 +9,34 @@ import ScrollReveal from "@/components/ScrollReveal";
 // Bay Area neighborhoods data
 const neighborhoods = [
   {
+    name: "San Carlos",
+    description: "Family-friendly with excellent schools",
+    url: "https://www.redfin.com/city/16687/CA/San-Carlos",
+    image: "/images/neighborhoods/san-carlos.jpg",
+  },
+  {
+    name: "Belmont",
+    description: "Charming hillside community",
+    url: "https://www.redfin.com/city/1362/CA/Belmont",
+    image: "/images/neighborhoods/belmont.jpg",
+  },
+  {
     name: "Palo Alto",
     description: "Tech hub with top schools",
+    url: "https://www.redfin.com/city/14325/CA/Palo-Alto",
     image: "/images/neighborhoods/palo-alto.jpg",
   },
   {
-    name: "San Jose",
-    description: "Heart of Silicon Valley",
-    image: "/images/neighborhoods/san-jose.jpg",
+    name: "Burlingame",
+    description: "Boutique downtown & tree-lined streets",
+    url: "https://www.redfin.com/city/2350/CA/Burlingame",
+    image: "/images/neighborhoods/burlingame.jpg",
   },
   {
-    name: "Cupertino",
-    description: "Apple headquarters & great schools",
-    image: "/images/neighborhoods/cupertino.jpg",
-  },
-  {
-    name: "Mountain View",
-    description: "Home to Google & vibrant downtown",
-    image: "/images/neighborhoods/mountain-view.jpg",
+    name: "San Francisco",
+    description: "Iconic city with diverse neighborhoods",
+    url: "https://www.redfin.com/city/17151/CA/San-Francisco",
+    image: "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=800&q=80",
   },
 ];
 
@@ -286,29 +296,37 @@ export default function Home() {
             </div>
           </ScrollReveal>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
             {neighborhoods.map((neighborhood, index) => (
               <ScrollReveal key={neighborhood.name} delay={index * 100}>
-                <div className="group relative aspect-[3/4] overflow-hidden cursor-pointer">
-                  {/* Background Image Placeholder */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-neutral-800 to-neutral-900">
-                    <div className="absolute inset-0 bg-[url('/images/pattern.png')] opacity-5" />
-                  </div>
+                <a
+                  href={neighborhood.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group relative aspect-[3/4] overflow-hidden cursor-pointer block"
+                >
+                  {/* Background Image */}
+                  <Image
+                    src={neighborhood.image}
+                    alt={neighborhood.name}
+                    fill
+                    className="object-cover transition-transform duration-700 group-hover:scale-110"
+                  />
 
-                  {/* Overlay */}
-                  <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors duration-300" />
+                  {/* Gradient Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent group-hover:from-black/90 transition-all duration-300" />
 
                   {/* Content */}
                   <div className="absolute inset-0 flex flex-col justify-end p-6">
                     <h3 className="font-serif text-2xl text-white mb-2 group-hover:text-[#d4a012] transition-colors">
                       {neighborhood.name}
                     </h3>
-                    <p className="text-white/70 text-sm">{neighborhood.description}</p>
+                    <p className="text-white/80 text-sm">{neighborhood.description}</p>
 
                     {/* Arrow icon on hover */}
                     <div className="mt-4 transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
-                      <span className="inline-flex items-center gap-2 text-[#d4a012] text-xs uppercase tracking-widest">
-                        Explore
+                      <span className="inline-flex items-center gap-2 text-[#d4a012] text-xs uppercase tracking-widest font-medium">
+                        View on Redfin
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                         </svg>
@@ -317,8 +335,8 @@ export default function Home() {
                   </div>
 
                   {/* Decorative border on hover */}
-                  <div className="absolute inset-4 border border-white/0 group-hover:border-white/20 transition-colors duration-300" />
-                </div>
+                  <div className="absolute inset-4 border border-white/0 group-hover:border-white/30 transition-colors duration-300" />
+                </a>
               </ScrollReveal>
             ))}
           </div>
