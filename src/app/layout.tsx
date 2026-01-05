@@ -4,6 +4,7 @@ import { Inter, Playfair_Display } from "next/font/google";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const inter = Inter({
@@ -415,6 +416,7 @@ export default function RootLayout({
         </main>
         <Footer />
         <ScrollToTop />
+        <Analytics />
       </body>
     </html>
   );
