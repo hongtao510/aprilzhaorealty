@@ -41,9 +41,10 @@ export async function POST(request: NextRequest) {
 
     // Send email using Resend
     const resend = new Resend(process.env.RESEND_API_KEY);
+    const recipientEmail = process.env.CONTACT_EMAIL || "aprilcasf@gmail.com";
     const { data, error } = await resend.emails.send({
       from: "April Zhao Realty <onboarding@resend.dev>",
-      to: ["aprilcasf@gmail.com"],
+      to: [recipientEmail],
       replyTo: body.email,
       subject: `New Contact Form Submission from ${body.name}`,
       html: `
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error("Resend error:", error);
       return NextResponse.json(
-        { error: "Failed to send email. Please try again later." },
+        { error: "Unable to send message. Please try again or contact us directly at aprilcasf@gmail.com" },
         { status: 500 }
       );
     }

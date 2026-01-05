@@ -930,44 +930,8 @@ export function getRecentListings(count: number = 3) {
   return listings.slice(0, count);
 }
 
-// Sample testimonials data
-export const testimonials: Testimonial[] = [
-  {
-    id: "1",
-    name: "Sarah M.",
-    completedTransaction: true,
-    content: "April was incredibly helpful throughout the entire home buying process. She really listened to what we were looking for and found us the perfect home in San Carlos. Her knowledge of the local market is unmatched, and she made what could have been a stressful experience feel smooth and manageable. Highly recommend!",
-    createdAt: "2025-10-15",
-  },
-  {
-    id: "2",
-    name: "Michael T.",
-    completedTransaction: true,
-    content: "We sold our Belmont home with April and couldn't be happier with the results. She helped us stage the property perfectly and negotiated an offer well above asking price. Her communication was excellent - she kept us informed every step of the way. Would definitely work with her again!",
-    createdAt: "2025-11-20",
-  },
-  {
-    id: "3",
-    name: "Jennifer L.",
-    completedTransaction: true,
-    content: "April helped us purchase our first home in Redwood City. As first-time buyers, we had so many questions, and April patiently answered every single one. She went above and beyond to ensure we understood the process and felt confident in our decision. A truly exceptional real estate professional.",
-    createdAt: "2025-09-08",
-  },
-  {
-    id: "4",
-    name: "David W.",
-    completedTransaction: false,
-    content: "I attended one of April's open houses and was immediately impressed by her professionalism and deep knowledge of the property and neighborhood. Even though I'm not quite ready to buy yet, I'll definitely be reaching out to April when the time comes.",
-    createdAt: "2025-12-01",
-  },
-  {
-    id: "5",
-    name: "Lisa & Kevin R.",
-    completedTransaction: true,
-    content: "April represented us on both the sale of our condo and the purchase of our new single-family home. Her expertise in navigating both transactions simultaneously was invaluable. She's not just a great agent - she's a trusted advisor who truly cares about her clients' best interests.",
-    createdAt: "2025-08-22",
-  },
-];
+// Testimonials data - populated from real client feedback
+export const testimonials: Testimonial[] = [];
 
 export function getTestimonials() {
   return testimonials;
