@@ -1,0 +1,14 @@
+# robots.txt for aprilzhaorealty.com
+# https://www.robotstxt.org/robotstxt.html
+
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://aprilzhaorealty.com/sitemap.xml
+
+# Disallow admin and API routes
+Disallow: /api/
+
+# Crawl-delay for respectful crawling
+Crawl-delay: 1
