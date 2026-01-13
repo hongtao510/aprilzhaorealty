@@ -7,11 +7,11 @@ export function AgentStructuredData() {
     "@graph": [
       {
         "@type": "RealEstateAgent",
-        "@id": "https://aprilzhaorealty.com/#agent",
+        "@id": "https://aprilzhaohome.com/#agent",
         name: "April Zhao",
-        url: "https://aprilzhaorealty.com",
-        logo: "https://aprilzhaorealty.com/images/logo.png",
-        image: "https://aprilzhaorealty.com/images/april-zhao.jpg",
+        url: "https://aprilzhaohome.com",
+        logo: "https://aprilzhaohome.com/images/logo.png",
+        image: "https://aprilzhaohome.com/images/april-zhao.jpg",
         description:
           "Your trusted real estate partner in the San Francisco Bay Area. Expert guidance for buying and selling homes in San Jose, San Mateo, Belmont, Redwood City, and surrounding areas.",
         email: "aprilcasf@gmail.com",
@@ -159,30 +159,30 @@ export function AgentStructuredData() {
         ],
         sameAs: [
           "https://www.linkedin.com/in/aprilzhao",
-          "https://www.instagram.com/aprilzhaorealty",
-          "https://www.facebook.com/aprilzhaorealty",
+          "https://www.instagram.com/aprilzhaohome",
+          "https://www.facebook.com/aprilzhaohome",
         ],
       },
       {
         "@type": "WebSite",
-        "@id": "https://aprilzhaorealty.com/#website",
-        url: "https://aprilzhaorealty.com",
+        "@id": "https://aprilzhaohome.com/#website",
+        url: "https://aprilzhaohome.com",
         name: "April Zhao | Bay Area Real Estate Agent",
         description:
           "Your trusted real estate partner in the San Francisco Bay Area.",
         publisher: {
-          "@id": "https://aprilzhaorealty.com/#agent",
+          "@id": "https://aprilzhaohome.com/#agent",
         },
         inLanguage: "en-US",
       },
       {
         "@type": "Organization",
-        "@id": "https://aprilzhaorealty.com/#organization",
+        "@id": "https://aprilzhaohome.com/#organization",
         name: "April Zhao Realty",
-        url: "https://aprilzhaorealty.com",
+        url: "https://aprilzhaohome.com",
         logo: {
           "@type": "ImageObject",
-          url: "https://aprilzhaorealty.com/images/logo.png",
+          url: "https://aprilzhaohome.com/images/logo.png",
         },
         contactPoint: {
           "@type": "ContactPoint",
@@ -210,12 +210,12 @@ export function ListingStructuredData({ listing }: { listing: Listing }) {
     "@type": "RealEstateListing",
     name: `${listing.address}, ${listing.city}`,
     description: listing.description,
-    url: `https://aprilzhaorealty.com/listings/${listing.id}`,
+    url: `https://aprilzhaohome.com/listings/${listing.id}`,
     datePosted: listing.soldDate,
     image:
       listing.images.length > 0
         ? listing.images[0].startsWith("/")
-          ? `https://aprilzhaorealty.com${listing.images[0]}`
+          ? `https://aprilzhaohome.com${listing.images[0]}`
           : listing.images[0]
         : undefined,
     offers: {
@@ -248,7 +248,7 @@ export function ListingStructuredData({ listing }: { listing: Listing }) {
     broker: {
       "@type": "RealEstateAgent",
       name: "April Zhao",
-      url: "https://aprilzhaorealty.com",
+      url: "https://aprilzhaohome.com",
     },
   };
 

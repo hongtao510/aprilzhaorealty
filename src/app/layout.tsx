@@ -17,7 +17,7 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://aprilzhaorealty.com"),
+  metadataBase: new URL("https://aprilzhaohome.com"),
   title: {
     default: "April Zhao | Bay Area Real Estate Agent",
     template: "%s | April Zhao Realty",
@@ -49,7 +49,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://aprilzhaorealty.com",
+    url: "https://aprilzhaohome.com",
     siteName: "April Zhao Realty",
     title: "April Zhao | Bay Area Real Estate Agent",
     description:
@@ -69,7 +69,7 @@ export const metadata: Metadata = {
     description:
       "Your trusted real estate partner in the San Francisco Bay Area. Expert guidance for buying and selling homes.",
     images: ["/images/og-image.jpg"],
-    creator: "@aprilzhaorealty",
+    creator: "@aprilzhaohome",
   },
   robots: {
     index: true,
@@ -87,7 +87,7 @@ export const metadata: Metadata = {
     // google: "your-google-verification-code",
   },
   alternates: {
-    canonical: "https://aprilzhaorealty.com",
+    canonical: "https://aprilzhaohome.com",
   },
 };
 

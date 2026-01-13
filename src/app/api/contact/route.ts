@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
             </p>
           </div>
           <p style="color: #666; font-size: 12px; margin-top: 20px;">
-            This email was sent from the contact form on aprilzhaorealty.com
+            This email was sent from the contact form on aprilzhaohome.com
           </p>
         </div>
       `,

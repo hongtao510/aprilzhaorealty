@@ -2,7 +2,7 @@ import { MetadataRoute } from "next";
 import { listings } from "@/lib/data";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = "https://aprilzhaorealty.com";
+  const baseUrl = "https://aprilzhaohome.com";
 
   // Static pages
   const staticPages: MetadataRoute.Sitemap = [

@@ -1,11 +1,11 @@
-# robots.txt for aprilzhaorealty.com
+# robots.txt for aprilzhaohome.com
 # https://www.robotstxt.org/robotstxt.html
 
 User-agent: *
 Allow: /
 
 # Sitemap location
-Sitemap: https://aprilzhaorealty.com/sitemap.xml
+Sitemap: https://aprilzhaohome.com/sitemap.xml
 
 # Disallow admin and API routes
 Disallow: /api/
