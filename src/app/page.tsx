@@ -173,38 +173,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Stats Section - Clean and minimal */}
-      <section className="py-20 bg-neutral-50">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12">
-            <ScrollReveal delay={0}>
-              <div className="text-center">
-                <p className="font-serif text-5xl md:text-6xl text-neutral-900 mb-2">23</p>
-                <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">Closings</p>
-              </div>
-            </ScrollReveal>
-            <ScrollReveal delay={100}>
-              <div className="text-center">
-                <p className="font-serif text-5xl md:text-6xl text-neutral-900 mb-2">$57M</p>
-                <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">Volume</p>
-              </div>
-            </ScrollReveal>
-            <ScrollReveal delay={200}>
-              <div className="text-center">
-                <p className="font-serif text-5xl md:text-6xl text-neutral-900 mb-2">$2.5M</p>
-                <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">Avg Sale</p>
-              </div>
-            </ScrollReveal>
-            <ScrollReveal delay={300}>
-              <div className="text-center">
-                <p className="font-serif text-5xl md:text-6xl text-neutral-900 mb-2">10+</p>
-                <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">Years</p>
-              </div>
-            </ScrollReveal>
-          </div>
-        </div>
-      </section>
-
       {/* Featured Listings - Elegant grid */}
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
