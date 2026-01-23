@@ -186,7 +186,7 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <p className="font-semibold">Areas Served</p>
-                    <p className="text-zinc-600">San Jose and Bay Area</p>
+                    <p className="text-zinc-600">Peninsula Bay Area</p>
                   </div>
                 </div>
               </div>

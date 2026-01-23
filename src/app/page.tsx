@@ -112,7 +112,7 @@ export default function Home() {
 
             {/* Subheadline */}
             <p className="text-lg text-white/80 max-w-xl mb-10 leading-relaxed">
-              With deep local expertise and a commitment to personalized service, I help families find their dream home in the San Francisco Bay Area.
+              With deep local expertise and a commitment to personalized service, I help families find their dream home in the Peninsula Bay Area.
             </p>
 
             {/* CTA Buttons - border style inspired by Dana Carmel */}

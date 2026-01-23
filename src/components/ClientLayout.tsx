@@ -236,12 +236,12 @@ export function Footer() {
               <span className="text-[#d4a012]">April</span> Zhao
             </div>
             <p className="text-neutral-400 text-sm leading-relaxed max-w-md mb-8">
-              Helping families find their perfect home in the San Francisco Bay Area with personalized service, deep local expertise, and a commitment to excellence.
+              Helping families find their perfect home in the Peninsula Bay Area with personalized service, deep local expertise, and a commitment to excellence.
             </p>
             <div className="flex items-center gap-4 mb-8">
               <span className="px-4 py-2 border border-[#d4a012] text-[#d4a012] text-xs uppercase tracking-widest">BQ Realty</span>
               <span className="text-neutral-500">|</span>
-              <span className="text-neutral-400 text-sm">San Jose, CA</span>
+              <span className="text-neutral-400 text-sm">Peninsula, CA</span>
             </div>
 
             {/* Social Links */}
@@ -345,7 +345,7 @@ export function Footer() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
                 </svg>
-                San Francisco Bay Area
+                Peninsula Bay Area
               </li>
             </ul>
           </div>
@@ -359,7 +359,7 @@ export function Footer() {
             &copy; {currentYear} April Zhao Realty
           </p>
           <div className="flex items-center gap-6 text-xs text-neutral-500 uppercase tracking-wider">
-            <span>DRE License #XXXXXXX</span>
+            <span>California Real Estate License #02157957</span>
           </div>
         </div>
       </div>

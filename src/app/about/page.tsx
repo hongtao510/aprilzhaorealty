@@ -34,9 +34,8 @@ export default function AboutPage() {
 
             <div className="space-y-4 text-zinc-600 leading-relaxed">
               <p>
-                Based in San Jose, I specialize in helping families buy and sell homes
-                across the Bay Area. With 23 closed sales and over $57 million in total
-                volume, I bring proven results to every transaction.
+                Based in Peninsula, I specialize in helping families buy and sell homes
+                across the Bay Area.
               </p>
               <p>
                 I work with a variety of property types including townhouses, single-family
@@ -71,7 +70,7 @@ export default function AboutPage() {
               <h3 className="font-bold text-lg mb-4">Credentials & Awards</h3>
               <ul className="space-y-3">
                 {[
-                  "California Real Estate License #01234567",
+                  "California Real Estate License #02157957",
                   "Member, National Association of Realtors",
                   "Certified Residential Specialist (CRS)",
                   "Top Producer Award 2022, 2023, 2024",
