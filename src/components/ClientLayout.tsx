@@ -183,50 +183,9 @@ export function Header() {
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
-  const [email, setEmail] = useState("");
-  const [subscribed, setSubscribed] = useState(false);
-
-  const handleSubscribe = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (email) {
-      setSubscribed(true);
-      setEmail("");
-      setTimeout(() => setSubscribed(false), 3000);
-    }
-  };
 
   return (
     <footer className="bg-neutral-900 text-white mt-auto">
-      {/* Newsletter Section */}
-      <div className="border-b border-neutral-800">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 py-16">
-          <div className="grid md:grid-cols-2 gap-8 items-center">
-            <div>
-              <p className="text-[#d4a012] text-xs uppercase tracking-[0.3em] mb-3">Stay Updated</p>
-              <h3 className={`${playfair.className} text-2xl md:text-3xl font-normal`}>
-                Subscribe to Market Updates
-              </h3>
-            </div>
-            <form onSubmit={handleSubscribe} className="flex gap-3">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
-                className="flex-1 px-5 py-4 bg-neutral-800 border border-neutral-700 text-white placeholder:text-neutral-500 text-sm focus:outline-none focus:border-[#d4a012] transition-colors"
-                required
-              />
-              <button
-                type="submit"
-                className="px-8 py-4 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-widest hover:bg-[#b8890f] transition-colors whitespace-nowrap"
-              >
-                {subscribed ? "Subscribed!" : "Subscribe"}
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-
       {/* Main Footer */}
       <div className="max-w-7xl mx-auto px-6 lg:px-8 py-16">
         <div className="grid md:grid-cols-4 gap-12">

@@ -110,9 +110,9 @@ export default function Home() {
               <span className="text-[#d4a012]">Bay Area</span>
             </h1>
 
-            {/* Subheadline */}
+            {/* Bio */}
             <p className="text-lg text-white/80 max-w-xl mb-10 leading-relaxed">
-              With deep local expertise and a commitment to personalized service, I help families find their dream home in the Peninsula Bay Area.
+              Peninsula-based real estate professional with deep local expertise and a data-driven approach. From A to Z, April is here to guide you throughout your buying or selling journey.
             </p>
 
             {/* CTA Buttons - border style inspired by Dana Carmel */}
@@ -124,10 +124,16 @@ export default function Home() {
                 View Listings
               </Link>
               <Link
+                href="/testimonials"
+                className="px-8 py-4 border-2 border-white text-white text-xs font-medium uppercase tracking-[0.15em] hover:bg-white hover:text-neutral-900 transition-all duration-300"
+              >
+                Testimonials
+              </Link>
+              <Link
                 href="/contact"
                 className="px-8 py-4 border-2 border-white text-white text-xs font-medium uppercase tracking-[0.15em] hover:bg-white hover:text-neutral-900 transition-all duration-300"
               >
-                Get in Touch
+                Schedule a Consultation
               </Link>
             </div>
           </div>
@@ -308,124 +314,6 @@ export default function Home() {
               </ScrollReveal>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* About/Services Section */}
-      <section className="py-24 bg-neutral-900 text-white">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-            <ScrollReveal direction="left">
-              <div>
-                <p className="text-[#d4a012] text-xs uppercase tracking-[0.3em] mb-4">Why Work With Me</p>
-                <h2 className="font-serif text-4xl md:text-5xl mb-6">A Different Approach to Real Estate</h2>
-                <div className="w-20 h-0.5 bg-[#d4a012] mb-8" />
-                <p className="text-neutral-400 leading-relaxed mb-8">
-                  Experience personalized service backed by deep market knowledge and a genuine commitment to your success. Every client receives dedicated attention and a customized strategy tailored to their unique needs.
-                </p>
-                <Link
-                  href="/about"
-                  className="inline-flex items-center gap-3 text-white text-sm uppercase tracking-[0.15em] font-medium hover:text-[#d4a012] transition-colors"
-                >
-                  Learn More
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                  </svg>
-                </Link>
-              </div>
-            </ScrollReveal>
-
-            <div className="grid grid-cols-1 gap-8">
-              <ScrollReveal direction="right" delay={0}>
-                <div className="border-l-2 border-[#d4a012] pl-8">
-                  <h3 className="font-serif text-2xl mb-3">Local Expertise</h3>
-                  <p className="text-neutral-400 text-sm leading-relaxed">
-                    Deep knowledge of Bay Area neighborhoods, schools, and market trends to help you make informed decisions.
-                  </p>
-                </div>
-              </ScrollReveal>
-              <ScrollReveal direction="right" delay={100}>
-                <div className="border-l-2 border-[#d4a012] pl-8">
-                  <h3 className="font-serif text-2xl mb-3">Personalized Service</h3>
-                  <p className="text-neutral-400 text-sm leading-relaxed">
-                    Every client receives dedicated attention and a customized strategy tailored to their unique needs and goals.
-                  </p>
-                </div>
-              </ScrollReveal>
-              <ScrollReveal direction="right" delay={200}>
-                <div className="border-l-2 border-[#d4a012] pl-8">
-                  <h3 className="font-serif text-2xl mb-3">Trusted Guidance</h3>
-                  <p className="text-neutral-400 text-sm leading-relaxed">
-                    Transparent communication and honest advice throughout your real estate journey, from search to closing.
-                  </p>
-                </div>
-              </ScrollReveal>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials Preview Section */}
-      <section className="py-24 bg-neutral-50">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          {/* Section Header */}
-          <ScrollReveal>
-            <div className="text-center mb-16">
-              <p className="text-[#d4a012] text-xs uppercase tracking-[0.3em] mb-4">Testimonials</p>
-              <h2 className="font-serif text-4xl md:text-5xl text-neutral-900 mb-4">What Clients Say</h2>
-              <div className="w-20 h-0.5 bg-[#d4a012] mx-auto" />
-            </div>
-          </ScrollReveal>
-
-          {/* Testimonials Grid */}
-          <div className="grid md:grid-cols-3 gap-8">
-            {getTestimonials().slice(0, 3).map((testimonial, index) => (
-              <ScrollReveal key={testimonial.id} delay={index * 100}>
-                <div className="bg-white p-10 hover:shadow-xl transition-shadow duration-300 h-full">
-                  {/* Quote Icon */}
-                  <div className="mb-6">
-                    <svg
-                      className="w-10 h-10 text-[#d4a012]"
-                      fill="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z" />
-                    </svg>
-                  </div>
-
-                  {/* Content */}
-                  <p className="text-neutral-600 leading-relaxed mb-8 line-clamp-4">
-                    {testimonial.content}
-                  </p>
-
-                  {/* Footer */}
-                  <div className="pt-6 border-t border-neutral-100">
-                    <p className="font-medium text-neutral-900">{testimonial.name}</p>
-                    {testimonial.completedTransaction && (
-                      <p className="text-[#d4a012] text-xs uppercase tracking-[0.15em] mt-1">
-                        Verified Client
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </ScrollReveal>
-            ))}
-          </div>
-
-          {/* CTA */}
-          <ScrollReveal delay={300}>
-            <div className="mt-12 text-center">
-              <Link
-                href="/testimonials"
-                className="inline-flex items-center gap-3 text-neutral-900 text-sm uppercase tracking-[0.15em] font-medium hover:text-[#d4a012] transition-colors"
-              >
-                View All Testimonials
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                </svg>
-              </Link>
-            </div>
-          </ScrollReveal>
         </div>
       </section>
 
