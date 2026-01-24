@@ -38,7 +38,7 @@ export interface Testimonial {
   id: string;
   name: string;
   email?: string;
-  completedTransaction: boolean;
+  rating: number;
   content: string;
   createdAt: string;
 }

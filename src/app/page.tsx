@@ -7,72 +7,83 @@ import { getListings, formatPrice, getTestimonials } from "@/lib/data";
 import ScrollReveal from "@/components/ScrollReveal";
 
 // Bay Area neighborhoods data
-const neighborhoods = [
-  {
-    name: "San Carlos",
-    description: "Family-friendly with excellent schools",
-    url: "https://www.redfin.com/city/16687/CA/San-Carlos",
-    image: "/images/neighborhoods/san-carlos.jpg",
-  },
-  {
-    name: "Belmont",
-    description: "Charming hillside community",
-    url: "https://www.redfin.com/city/1362/CA/Belmont",
-    image: "/images/neighborhoods/belmont.jpg",
-  },
-  {
-    name: "Palo Alto",
-    description: "Tech hub with top schools",
-    url: "https://www.redfin.com/city/14325/CA/Palo-Alto",
-    image: "/images/neighborhoods/palo-alto.jpg",
-  },
-  {
-    name: "Burlingame",
-    description: "Boutique downtown & tree-lined streets",
-    url: "https://www.redfin.com/city/2350/CA/Burlingame",
-    image: "/images/neighborhoods/burlingame.jpg",
-  },
+// Row 1: SF, Millbrae, Burlingame, Hillsborough, San Mateo, Belmont, San Carlos
+const neighborhoodsRow1 = [
   {
     name: "San Francisco",
-    description: "Iconic city with diverse neighborhoods",
+    description: "Iconic city living",
     url: "https://www.redfin.com/city/17151/CA/San-Francisco",
     image: "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=800&q=80",
   },
   {
     name: "Millbrae",
-    description: "Convenient BART access & diverse dining",
+    description: "BART access & dining",
     url: "https://www.redfin.com/city/12130/CA/Millbrae",
     image: "/images/neighborhoods/millbrae.jpg",
   },
   {
+    name: "Burlingame",
+    description: "Boutique downtown",
+    url: "https://www.redfin.com/city/2350/CA/Burlingame",
+    image: "/images/neighborhoods/burlingame.jpg",
+  },
+  {
+    name: "Hillsborough",
+    description: "Prestigious estates",
+    url: "https://www.redfin.com/city/8293/CA/Hillsborough",
+    image: "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=800&q=80",
+  },
+  {
     name: "San Mateo",
-    description: "Vibrant downtown & excellent parks",
+    description: "Vibrant downtown",
     url: "https://www.redfin.com/city/17490/CA/San-Mateo",
     image: "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800&q=80",
   },
   {
+    name: "Belmont",
+    description: "Hillside charm",
+    url: "https://www.redfin.com/city/1362/CA/Belmont",
+    image: "/images/neighborhoods/belmont.jpg",
+  },
+  {
+    name: "San Carlos",
+    description: "Excellent schools",
+    url: "https://www.redfin.com/city/16687/CA/San-Carlos",
+    image: "/images/neighborhoods/san-carlos.jpg",
+  },
+];
+
+// Row 2: Foster City, Redwood Shores, Redwood City, Menlo Park, Palo Alto
+const neighborhoodsRow2 = [
+  {
     name: "Foster City",
-    description: "Waterfront living & top-rated schools",
+    description: "Waterfront living",
     url: "https://www.redfin.com/city/6524/CA/Foster-City",
     image: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&q=80",
   },
   {
     name: "Redwood Shores",
-    description: "Lagoon views & tech company headquarters",
+    description: "Lagoon views",
     url: "https://www.redfin.com/neighborhood/115895/CA/Redwood-City/Redwood-Shores",
     image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80",
   },
   {
     name: "Redwood City",
-    description: "Climate best by government test",
+    description: "Best climate",
     url: "https://www.redfin.com/city/15525/CA/Redwood-City",
     image: "https://images.unsplash.com/photo-1605276374104-dee2a0ed3cd6?w=800&q=80",
   },
   {
     name: "Menlo Park",
-    description: "Home of Meta & Stanford neighbors",
+    description: "Tech & Stanford",
     url: "https://www.redfin.com/city/11961/CA/Menlo-Park",
     image: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&q=80",
+  },
+  {
+    name: "Palo Alto",
+    description: "Top schools",
+    url: "https://www.redfin.com/city/14325/CA/Palo-Alto",
+    image: "/images/neighborhoods/palo-alto.jpg",
   },
 ];
 
@@ -81,7 +92,7 @@ export default function Home() {
   // Filter listings that have images for the carousel
   const listingsWithImages = allListings.filter((listing) => listing.images.length > 0);
   const carouselListings = listingsWithImages.slice(0, 8); // Show up to 8 listings in carousel
-  const recentListings = allListings.slice(0, 6);
+  const recentListings = allListings.slice(0, 9);
 
   const [currentSlide, setCurrentSlide] = useState(0);
 
@@ -203,8 +214,75 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Featured Listings - Elegant grid */}
+      {/* Upcoming Listings Section */}
       <section className="py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8">
+          <ScrollReveal>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-16">
+              <div>
+                <p className="text-[#d4a012] text-xs uppercase tracking-[0.3em] mb-4">Coming Soon</p>
+                <h2 className="font-serif text-4xl md:text-5xl text-neutral-900">Upcoming Listings</h2>
+                <div className="w-20 h-0.5 bg-[#d4a012] mt-6" />
+              </div>
+            </div>
+          </ScrollReveal>
+
+          {/* Upcoming Listings Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <ScrollReveal delay={0}>
+              <div className="bg-neutral-50 p-8 border border-neutral-200 hover:border-[#d4a012] transition-colors">
+                <div className="mb-4">
+                  <span className="px-3 py-1 bg-[#d4a012]/10 text-[#d4a012] text-xs uppercase tracking-[0.15em]">
+                    Coming Soon
+                  </span>
+                </div>
+                <h3 className="font-serif text-xl text-neutral-900 mb-2">Townhouse in Belmont</h3>
+                <p className="text-neutral-500 text-sm mb-4">Belmont, CA</p>
+                <div className="flex items-center gap-6 text-sm text-neutral-600">
+                  <span>3 Beds</span>
+                  <span>2.5 Baths</span>
+                </div>
+              </div>
+            </ScrollReveal>
+
+            <ScrollReveal delay={100}>
+              <div className="bg-neutral-50 p-8 border border-neutral-200 hover:border-[#d4a012] transition-colors">
+                <div className="mb-4">
+                  <span className="px-3 py-1 bg-[#d4a012]/10 text-[#d4a012] text-xs uppercase tracking-[0.15em]">
+                    Coming Soon
+                  </span>
+                </div>
+                <h3 className="font-serif text-xl text-neutral-900 mb-2">Single Family in Belmont</h3>
+                <p className="text-neutral-500 text-sm mb-4">Belmont, CA</p>
+                <div className="flex items-center gap-6 text-sm text-neutral-600">
+                  <span>3 Beds</span>
+                  <span>1.5 Baths</span>
+                </div>
+              </div>
+            </ScrollReveal>
+
+            <ScrollReveal delay={200}>
+              <div className="bg-neutral-50 p-8 border border-neutral-200 hover:border-[#d4a012] transition-colors">
+                <div className="mb-4">
+                  <span className="px-3 py-1 bg-[#d4a012]/10 text-[#d4a012] text-xs uppercase tracking-[0.15em]">
+                    Coming Soon
+                  </span>
+                </div>
+                <h3 className="font-serif text-xl text-neutral-900 mb-2">Single Family in San Francisco</h3>
+                <p className="text-neutral-500 text-sm mb-4">San Francisco, CA</p>
+                <div className="flex items-center gap-6 text-sm text-neutral-600">
+                  <span>3 Beds</span>
+                  <span>1 Bath</span>
+                </div>
+              </div>
+            </ScrollReveal>
+          </div>
+
+        </div>
+      </section>
+
+      {/* Recently Sold Homes */}
+      <section className="py-24 bg-neutral-50">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           {/* Section Header */}
           <ScrollReveal>
@@ -283,134 +361,70 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Upcoming Listings Section */}
-      <section className="py-24 bg-neutral-50">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <ScrollReveal>
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-16">
-              <div>
-                <p className="text-[#d4a012] text-xs uppercase tracking-[0.3em] mb-4">Coming Soon</p>
-                <h2 className="font-serif text-4xl md:text-5xl text-neutral-900">Upcoming Listings</h2>
-                <div className="w-20 h-0.5 bg-[#d4a012] mt-6" />
-              </div>
-            </div>
-          </ScrollReveal>
-
-          {/* Upcoming Listings Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <ScrollReveal delay={0}>
-              <div className="bg-white p-8 border border-neutral-200 hover:border-[#d4a012] transition-colors">
-                <div className="mb-4">
-                  <span className="px-3 py-1 bg-[#d4a012]/10 text-[#d4a012] text-xs uppercase tracking-[0.15em]">
-                    Coming Soon
-                  </span>
-                </div>
-                <h3 className="font-serif text-xl text-neutral-900 mb-2">Townhouse in Belmont</h3>
-                <p className="text-neutral-500 text-sm mb-4">Belmont, CA</p>
-                <div className="flex items-center gap-6 text-sm text-neutral-600">
-                  <span>3 Beds</span>
-                  <span>2.5 Baths</span>
-                </div>
-              </div>
-            </ScrollReveal>
-
-            <ScrollReveal delay={100}>
-              <div className="bg-white p-8 border border-neutral-200 hover:border-[#d4a012] transition-colors">
-                <div className="mb-4">
-                  <span className="px-3 py-1 bg-[#d4a012]/10 text-[#d4a012] text-xs uppercase tracking-[0.15em]">
-                    Coming Soon
-                  </span>
-                </div>
-                <h3 className="font-serif text-xl text-neutral-900 mb-2">Single Family in Belmont</h3>
-                <p className="text-neutral-500 text-sm mb-4">Belmont, CA</p>
-                <div className="flex items-center gap-6 text-sm text-neutral-600">
-                  <span>3 Beds</span>
-                  <span>1.5 Baths</span>
-                </div>
-              </div>
-            </ScrollReveal>
-
-            <ScrollReveal delay={200}>
-              <div className="bg-white p-8 border border-neutral-200 hover:border-[#d4a012] transition-colors">
-                <div className="mb-4">
-                  <span className="px-3 py-1 bg-[#d4a012]/10 text-[#d4a012] text-xs uppercase tracking-[0.15em]">
-                    Coming Soon
-                  </span>
-                </div>
-                <h3 className="font-serif text-xl text-neutral-900 mb-2">Single Family in San Francisco</h3>
-                <p className="text-neutral-500 text-sm mb-4">San Francisco, CA</p>
-                <div className="flex items-center gap-6 text-sm text-neutral-600">
-                  <span>3 Beds</span>
-                  <span>1 Bath</span>
-                </div>
-              </div>
-            </ScrollReveal>
-          </div>
-
-          {/* Contact Button */}
-          <ScrollReveal delay={300}>
-            <div className="text-center mt-12">
-              <Link
-                href="/contact"
-                className="inline-block px-10 py-4 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-[0.15em] hover:bg-[#b8890f] transition-all duration-300"
-              >
-                Contact April for More Information
-              </Link>
-            </div>
-          </ScrollReveal>
-        </div>
-      </section>
-
       {/* Neighborhoods Section - Dana Carmel Inspired */}
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <ScrollReveal>
             <div className="text-center mb-16">
-              <h2 className="font-serif text-4xl md:text-5xl text-neutral-900 mb-4">Explore Properties</h2>
+              <p className="text-[#d4a012] text-xs uppercase tracking-[0.3em] mb-4">Explored Properties in</p>
+              <h2 className="font-serif text-4xl md:text-5xl text-neutral-900 mb-4">Featured Cities</h2>
               <div className="w-20 h-0.5 bg-[#d4a012] mx-auto" />
             </div>
           </ScrollReveal>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
-            {neighborhoods.map((neighborhood, index) => (
-              <ScrollReveal key={neighborhood.name} delay={index * 100}>
+          {/* Row 1: 7 cities */}
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-4">
+            {neighborhoodsRow1.map((neighborhood, index) => (
+              <ScrollReveal key={neighborhood.name} delay={index * 50}>
                 <a
                   href={neighborhood.url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="group relative aspect-[3/4] overflow-hidden cursor-pointer block"
                 >
-                  {/* Background Image */}
                   <Image
                     src={neighborhood.image}
                     alt={neighborhood.name}
                     fill
                     className="object-cover transition-transform duration-700 group-hover:scale-110"
                   />
-
-                  {/* Gradient Overlay */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent group-hover:from-black/90 transition-all duration-300" />
-
-                  {/* Content */}
-                  <div className="absolute inset-0 flex flex-col justify-end p-6">
-                    <h3 className="font-serif text-2xl text-white mb-2 group-hover:text-[#d4a012] transition-colors">
+                  <div className="absolute inset-0 flex flex-col justify-end p-4">
+                    <h3 className="font-serif text-lg text-white mb-1 group-hover:text-[#d4a012] transition-colors">
                       {neighborhood.name}
                     </h3>
-                    <p className="text-white/80 text-sm">{neighborhood.description}</p>
-
-                    {/* Arrow icon on hover */}
-                    <div className="mt-4 transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
-                      <span className="inline-flex items-center gap-2 text-[#d4a012] text-xs uppercase tracking-widest font-medium">
-                        View on Redfin
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                        </svg>
-                      </span>
-                    </div>
+                    <p className="text-white/80 text-xs">{neighborhood.description}</p>
                   </div>
+                  <div className="absolute inset-3 border border-white/0 group-hover:border-white/30 transition-colors duration-300" />
+                </a>
+              </ScrollReveal>
+            ))}
+          </div>
 
-                  {/* Decorative border on hover */}
-                  <div className="absolute inset-4 border border-white/0 group-hover:border-white/30 transition-colors duration-300" />
+          {/* Row 2: 5 cities - centered */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 lg:px-[14.28%]">
+            {neighborhoodsRow2.map((neighborhood, index) => (
+              <ScrollReveal key={neighborhood.name} delay={(index + 7) * 50}>
+                <a
+                  href={neighborhood.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group relative aspect-[3/4] overflow-hidden cursor-pointer block"
+                >
+                  <Image
+                    src={neighborhood.image}
+                    alt={neighborhood.name}
+                    fill
+                    className="object-cover transition-transform duration-700 group-hover:scale-110"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent group-hover:from-black/90 transition-all duration-300" />
+                  <div className="absolute inset-0 flex flex-col justify-end p-4">
+                    <h3 className="font-serif text-lg text-white mb-1 group-hover:text-[#d4a012] transition-colors">
+                      {neighborhood.name}
+                    </h3>
+                    <p className="text-white/80 text-xs">{neighborhood.description}</p>
+                  </div>
+                  <div className="absolute inset-3 border border-white/0 group-hover:border-white/30 transition-colors duration-300" />
                 </a>
               </ScrollReveal>
             ))}
@@ -419,33 +433,33 @@ export default function Home() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-24 bg-neutral-900 relative overflow-hidden">
-        {/* Subtle pattern */}
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute inset-0" style={{backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '40px 40px'}} />
-        </div>
-
-        <div className="max-w-4xl mx-auto px-6 lg:px-8 relative z-10 text-center">
+      <section className="py-24 bg-neutral-50">
+        <div className="max-w-4xl mx-auto px-6 lg:px-8 text-center">
           <ScrollReveal>
-            <p className="text-[#d4a012] text-xs uppercase tracking-[0.3em] mb-6">Ready to Get Started?</p>
-            <h2 className="font-serif text-4xl md:text-5xl text-white mb-6">
-              Let&apos;s Find Your Perfect Home
+            <p className="text-[#d4a012] text-xs uppercase tracking-[0.3em] mb-4">Looking for Something Specific?</p>
+            <h2 className="font-serif text-3xl md:text-4xl text-neutral-900 mb-6">
+              Don&apos;t See What You&apos;re Looking For?
             </h2>
             <div className="w-20 h-0.5 bg-[#d4a012] mx-auto mb-8" />
-            <p className="text-neutral-400 mb-10 max-w-2xl mx-auto leading-relaxed">
-              Whether you&apos;re buying your first home, selling a property, or exploring investment opportunities, I&apos;m here to support you every step of the way.
+            <p className="text-neutral-600 mb-10 max-w-2xl mx-auto leading-relaxed">
+              I have access to off-market properties and upcoming listings. Let&apos;s discuss your specific needs and find the perfect property together.
             </p>
           </ScrollReveal>
           <ScrollReveal delay={200}>
             <div className="flex flex-wrap justify-center gap-4">
               <Link
                 href="/contact"
-                className="px-10 py-4 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-[0.15em] hover:bg-[#b8890f] transition-all duration-300"
+                className="px-10 py-4 bg-neutral-900 text-white text-xs font-medium uppercase tracking-[0.15em] hover:bg-[#d4a012] transition-all duration-300"
               >
-                Schedule a Free Consultation
+                Contact Me
               </Link>
+              <a
+                href="mailto:aprilcasf@gmail.com"
+                className="px-10 py-4 border-2 border-neutral-900 text-neutral-900 text-xs font-medium uppercase tracking-[0.15em] hover:bg-neutral-900 hover:text-white transition-all duration-300"
+              >
+                Email Directly
+              </a>
             </div>
-
           </ScrollReveal>
         </div>
       </section>

@@ -21,15 +21,12 @@ export default function ListingsPage() {
 
         <div className="max-w-7xl mx-auto px-6 lg:px-8 relative z-10">
           <div className="max-w-3xl">
-            <p className="text-[#d4a012] text-xs uppercase tracking-[0.3em] mb-6">
-              {listings.length} Properties
-            </p>
             <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl text-white mb-6">
               Property Portfolio
             </h1>
             <div className="w-20 h-0.5 bg-[#d4a012] mb-8" />
             <p className="text-lg text-neutral-400 max-w-2xl leading-relaxed">
-              Explore my complete collection of properties, from available homes to recently closed transactions across the Bay Area.
+              Explore my upcoming listings and featured closed transactions across the Bay Area.
             </p>
           </div>
         </div>
@@ -105,6 +102,70 @@ export default function ListingsPage() {
           </section>
         )}
 
+        {/* Upcoming Listings Section */}
+        <section className="mb-24">
+          <ScrollReveal>
+            <div className="flex items-center gap-4 mb-12">
+              <div>
+                <p className="text-[#d4a012] text-xs uppercase tracking-[0.3em] mb-2">Coming Soon</p>
+                <h2 className="font-serif text-3xl text-neutral-900">
+                  Upcoming Listings
+                </h2>
+              </div>
+            </div>
+          </ScrollReveal>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <ScrollReveal delay={0}>
+              <div className="bg-neutral-50 p-8 border border-neutral-200 hover:border-[#d4a012] transition-colors">
+                <div className="mb-4">
+                  <span className="px-3 py-1 bg-[#d4a012]/10 text-[#d4a012] text-xs uppercase tracking-[0.15em]">
+                    Coming Soon
+                  </span>
+                </div>
+                <h3 className="font-serif text-xl text-neutral-900 mb-2">Townhouse in Belmont</h3>
+                <p className="text-neutral-500 text-sm mb-4">Belmont, CA</p>
+                <div className="flex items-center gap-6 text-sm text-neutral-600">
+                  <span>3 Beds</span>
+                  <span>2.5 Baths</span>
+                </div>
+              </div>
+            </ScrollReveal>
+
+            <ScrollReveal delay={100}>
+              <div className="bg-neutral-50 p-8 border border-neutral-200 hover:border-[#d4a012] transition-colors">
+                <div className="mb-4">
+                  <span className="px-3 py-1 bg-[#d4a012]/10 text-[#d4a012] text-xs uppercase tracking-[0.15em]">
+                    Coming Soon
+                  </span>
+                </div>
+                <h3 className="font-serif text-xl text-neutral-900 mb-2">Single Family in Belmont</h3>
+                <p className="text-neutral-500 text-sm mb-4">Belmont, CA</p>
+                <div className="flex items-center gap-6 text-sm text-neutral-600">
+                  <span>3 Beds</span>
+                  <span>1.5 Baths</span>
+                </div>
+              </div>
+            </ScrollReveal>
+
+            <ScrollReveal delay={200}>
+              <div className="bg-neutral-50 p-8 border border-neutral-200 hover:border-[#d4a012] transition-colors">
+                <div className="mb-4">
+                  <span className="px-3 py-1 bg-[#d4a012]/10 text-[#d4a012] text-xs uppercase tracking-[0.15em]">
+                    Coming Soon
+                  </span>
+                </div>
+                <h3 className="font-serif text-xl text-neutral-900 mb-2">Single Family in San Francisco</h3>
+                <p className="text-neutral-500 text-sm mb-4">San Francisco, CA</p>
+                <div className="flex items-center gap-6 text-sm text-neutral-600">
+                  <span>3 Beds</span>
+                  <span>1 Bath</span>
+                </div>
+              </div>
+            </ScrollReveal>
+          </div>
+        </section>
+
         {/* Sold Listings Section */}
         <section>
           <ScrollReveal>
@@ -112,7 +173,7 @@ export default function ListingsPage() {
               <div>
                 <p className="text-[#d4a012] text-xs uppercase tracking-[0.3em] mb-2">Closed Transactions</p>
                 <h2 className="font-serif text-3xl text-neutral-900">
-                  {soldListings.length} Successfully Sold
+                  Successfully Sold Homes
                 </h2>
               </div>
             </div>
@@ -184,32 +245,31 @@ export default function ListingsPage() {
       </div>
 
       {/* CTA Section */}
-      <section className="py-24 bg-neutral-50">
-        <div className="max-w-4xl mx-auto px-6 lg:px-8 text-center">
+      <section className="py-24 bg-neutral-900 relative overflow-hidden">
+        {/* Subtle pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute inset-0" style={{backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '40px 40px'}} />
+        </div>
+
+        <div className="max-w-4xl mx-auto px-6 lg:px-8 relative z-10 text-center">
           <ScrollReveal>
-            <p className="text-[#d4a012] text-xs uppercase tracking-[0.3em] mb-4">Looking for Something Specific?</p>
-            <h2 className="font-serif text-3xl md:text-4xl text-neutral-900 mb-6">
-              Don&apos;t See What You&apos;re Looking For?
+            <p className="text-[#d4a012] text-xs uppercase tracking-[0.3em] mb-6">Ready to Get Started?</p>
+            <h2 className="font-serif text-4xl md:text-5xl text-white mb-6">
+              Let&apos;s Find Your Perfect Home
             </h2>
             <div className="w-20 h-0.5 bg-[#d4a012] mx-auto mb-8" />
-            <p className="text-neutral-600 mb-10 max-w-2xl mx-auto leading-relaxed">
-              I have access to off-market properties and upcoming listings. Let&apos;s discuss your specific needs and find the perfect property together.
+            <p className="text-neutral-400 mb-10 max-w-2xl mx-auto leading-relaxed">
+              Whether you&apos;re buying your first home, selling a property, or exploring investment opportunities, I&apos;m here to support you every step of the way.
             </p>
           </ScrollReveal>
           <ScrollReveal delay={200}>
             <div className="flex flex-wrap justify-center gap-4">
               <Link
                 href="/contact"
-                className="px-10 py-4 bg-neutral-900 text-white text-xs font-medium uppercase tracking-[0.15em] hover:bg-[#d4a012] transition-all duration-300"
+                className="px-10 py-4 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-[0.15em] hover:bg-[#b8890f] transition-all duration-300"
               >
-                Contact Me
+                Schedule a Free Consultation
               </Link>
-              <a
-                href="mailto:aprilcasf@gmail.com"
-                className="px-10 py-4 border-2 border-neutral-900 text-neutral-900 text-xs font-medium uppercase tracking-[0.15em] hover:bg-neutral-900 hover:text-white transition-all duration-300"
-              >
-                Email Directly
-              </a>
             </div>
           </ScrollReveal>
         </div>

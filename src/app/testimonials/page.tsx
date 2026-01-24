@@ -11,7 +11,7 @@ export default function TestimonialsPage() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    completedTransaction: null as boolean | null,
+    rating: 0,
     content: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -21,8 +21,8 @@ export default function TestimonialsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (formData.completedTransaction === null) {
-      setError("Please indicate whether April helped you complete a transaction.");
+    if (formData.rating === 0) {
+      setError("Please rate your experience with April.");
       return;
     }
 
@@ -47,14 +47,14 @@ export default function TestimonialsPage() {
       id: Date.now().toString(),
       name: formData.name,
       email: formData.email || undefined,
-      completedTransaction: formData.completedTransaction,
+      rating: formData.rating,
       content: formData.content,
       createdAt: new Date().toISOString().split("T")[0],
     };
 
     // Add to local state (would normally be saved to backend)
     setTestimonials([newTestimonial, ...testimonials]);
-    setFormData({ name: "", email: "", completedTransaction: null, content: "" });
+    setFormData({ name: "", email: "", rating: 0, content: "" });
     setIsSubmitting(false);
     setSubmitted(true);
 
@@ -143,41 +143,33 @@ export default function TestimonialsPage() {
 
                 <div>
                   <label className="block text-sm font-semibold mb-3">
-                    Did April help you complete a real estate transaction? <span className="text-red-500">*</span>
+                    How would you rate your experience with April? <span className="text-red-500">*</span>
                   </label>
-                  <div className="flex gap-4">
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, completedTransaction: true })}
-                      className={`flex-1 py-4 px-6 rounded-xl font-medium border-2 transition-all ${
-                        formData.completedTransaction === true
-                          ? "border-[#166534] bg-emerald-50 text-[#166534]"
-                          : "border-zinc-200 hover:border-[#166534]"
-                      }`}
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, rating: star })}
+                        className="p-2 transition-transform hover:scale-110"
+                      >
+                        <svg
+                          className={`w-8 h-8 ${
+                            formData.rating >= star ? "text-[#d4a012] fill-[#d4a012]" : "text-zinc-300"
+                          }`}
+                          fill={formData.rating >= star ? "currentColor" : "none"}
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={1.5}
+                            d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+                          />
                         </svg>
-                        Yes
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, completedTransaction: false })}
-                      className={`flex-1 py-4 px-6 rounded-xl font-medium border-2 transition-all ${
-                        formData.completedTransaction === false
-                          ? "border-[#f59e0b] bg-amber-50 text-[#b45309]"
-                          : "border-zinc-200 hover:border-[#f59e0b]"
-                      }`}
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                        No
-                      </div>
-                    </button>
+                      </button>
+                    ))}
                   </div>
                 </div>
 

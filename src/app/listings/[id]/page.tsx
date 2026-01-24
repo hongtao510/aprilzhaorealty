@@ -313,8 +313,8 @@ export default async function ListingPage({
                   </div>
                   <div>
                     <p className="font-bold text-lg text-zinc-900">April Zhao</p>
-                    <p className="text-sm text-zinc-500">Real Estate Agent</p>
-                    <p className="text-xs text-[#166534] font-medium">BQ Realty</p>
+                    <p className="text-xs text-[#d4a012] tracking-wide mb-1">Expertise. Ethics. Excellence.</p>
+                    <p className="text-xs text-neutral-500">BQ Realty</p>
                   </div>
                 </div>
                 <p className="text-sm text-zinc-600 mb-6 leading-relaxed">
