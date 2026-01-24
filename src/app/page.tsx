@@ -42,7 +42,7 @@ const neighborhoods = [
     name: "Millbrae",
     description: "Convenient BART access & diverse dining",
     url: "https://www.redfin.com/city/12130/CA/Millbrae",
-    image: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=80",
+    image: "/images/neighborhoods/millbrae.jpg",
   },
   {
     name: "San Mateo",
@@ -371,7 +371,7 @@ export default function Home() {
             </div>
           </ScrollReveal>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
             {neighborhoods.map((neighborhood, index) => (
               <ScrollReveal key={neighborhood.name} delay={index * 100}>
                 <a
