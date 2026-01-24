@@ -20,8 +20,8 @@ export default function AboutPage() {
                 About April Zhao
               </p>
               <h1 className="font-serif text-5xl md:text-6xl lg:text-7xl font-normal mb-8 leading-[1.1]">
-                Guiding You Home
-                <span className="block text-[#d4a012]">With Confidence</span>
+                Your Trusted Partner
+                <span className="block text-[#d4a012]">on the Journey Home</span>
               </h1>
               <div className="w-24 h-0.5 bg-[#d4a012]" />
             </ScrollReveal>
@@ -84,13 +84,13 @@ export default function AboutPage() {
               <ScrollReveal delay={100}>
                 <div className="space-y-6 text-neutral-600 text-lg leading-relaxed">
                   <p>
-                    April is a Peninsula-based real estate professional specializing in the local market. By combining deep neighborhood and community knowledge with a rigorous analytical background, she provides her clients with honest, data-driven insights.
+                    April has lived and worked in the Peninsula and San Francisco for many years, developing deep knowledge of local market dynamics and strong community insights. Holding a Ph.D. in business, April is trained to make analytical and strategic decisions grounded in ethics and integrity, providing honest, intelligence-driven guidance and support her clients can trust.
                   </p>
                   <p>
-                    April advocates tirelessly at every stage of the process, ensuring her clients make confident, well-informed decisions. She is committed to delivering exceptional, personalized service tailored to each client and exceeding expectations with the best possible outcomes.
+                    April advocates tirelessly for her clients at every stage of the process, ensuring they make confident, well-informed decisions. She is committed to delivering exceptional, personalized service tailored to each client and consistently exceeding expectations to achieve the best possible outcomes.
                   </p>
                   <p className="text-neutral-900 font-medium">
-                    From A to Z, April is here to guide and support you throughout your buying or selling journey.
+                    From A to Z, April is here to ensure your buying or selling journey is seamless, informed, and successful.
                   </p>
                 </div>
               </ScrollReveal>

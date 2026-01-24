@@ -177,18 +177,6 @@ export default function ContactPage() {
                   </div>
                 </div>
 
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-[#86efac] rounded-xl flex items-center justify-center flex-shrink-0">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="font-semibold">Areas Served</p>
-                    <p className="text-zinc-600">Peninsula Bay Area</p>
-                  </div>
-                </div>
               </div>
             </div>
 
@@ -197,7 +185,7 @@ export default function ContactPage() {
               <h3 className="font-bold text-lg mb-3">Quick Response Guaranteed</h3>
               <p className="text-emerald-100 text-sm leading-relaxed">
                 I understand that timing is everything in real estate. Expect a response
-                within 24 hours — usually much sooner.
+                within the same day — usually much sooner.
               </p>
             </div>
           </div>

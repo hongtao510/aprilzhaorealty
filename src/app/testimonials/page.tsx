@@ -68,39 +68,16 @@ export default function TestimonialsPage() {
   return (
     <div>
       {/* Hero Section */}
-      <section className="bg-[#166534] text-white py-20 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-[#86efac] rounded-full blur-3xl opacity-20" />
-        <div className="absolute bottom-0 left-0 w-72 h-72 bg-[#0d9488] rounded-full blur-3xl opacity-15" />
-        <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <span className="inline-block text-sm font-semibold text-emerald-200 uppercase tracking-wider mb-4">
-            Client Testimonials
-          </span>
-          <h1 className="text-5xl font-bold mb-4">What Our Clients Say</h1>
-          <p className="text-xl text-emerald-100 max-w-2xl">
-            Hear from clients who have worked with me on their real estate journey. Your feedback helps me serve you better.
-          </p>
-        </div>
-      </section>
-
-      {/* Stats Bar */}
-      <section className="py-8 bg-white border-b border-zinc-100">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex flex-wrap justify-center gap-8 md:gap-16">
-            <div className="text-center">
-              <p className="text-3xl font-bold text-[#166534]">23+</p>
-              <p className="text-sm text-zinc-500">Happy Families</p>
-            </div>
-            <div className="hidden md:block w-px h-12 bg-zinc-200 self-center" />
-            <div className="text-center">
-              <p className="text-3xl font-bold text-[#166534]">5.0</p>
-              <p className="text-sm text-zinc-500">Average Rating</p>
-            </div>
-            <div className="hidden md:block w-px h-12 bg-zinc-200 self-center" />
-            <div className="text-center">
-              <p className="text-3xl font-bold text-[#166534]">100%</p>
-              <p className="text-sm text-zinc-500">Satisfaction</p>
-            </div>
-          </div>
+      <section className="bg-neutral-900 text-white py-24 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0wIDBoNjB2NjBIMHoiLz48cGF0aCBkPSJNMzAgMzBtLTEgMGExIDEgMCAxIDAgMiAwIDEgMSAwIDEgMCAtMiAwIiBmaWxsPSIjZDRhMDEyIiBmaWxsLW9wYWNpdHk9IjAuMDUiLz48L2c+PC9zdmc+')] opacity-50" />
+        <div className="max-w-5xl mx-auto px-6 relative z-10 text-center">
+          <p className="text-[#d4a012] text-xs uppercase tracking-[0.4em] mb-6">Client Stories</p>
+          <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl font-normal leading-tight mb-8">
+            Hear from clients who have
+            <span className="block mt-2 text-[#d4a012] italic">worked with me</span>
+            on their real estate journey
+          </h1>
+          <div className="w-20 h-0.5 bg-[#d4a012] mx-auto" />
         </div>
       </section>
 
