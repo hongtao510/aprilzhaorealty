@@ -38,6 +38,42 @@ const neighborhoods = [
     url: "https://www.redfin.com/city/17151/CA/San-Francisco",
     image: "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=800&q=80",
   },
+  {
+    name: "Millbrae",
+    description: "Convenient BART access & diverse dining",
+    url: "https://www.redfin.com/city/12130/CA/Millbrae",
+    image: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=80",
+  },
+  {
+    name: "San Mateo",
+    description: "Vibrant downtown & excellent parks",
+    url: "https://www.redfin.com/city/17490/CA/San-Mateo",
+    image: "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800&q=80",
+  },
+  {
+    name: "Foster City",
+    description: "Waterfront living & top-rated schools",
+    url: "https://www.redfin.com/city/6524/CA/Foster-City",
+    image: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&q=80",
+  },
+  {
+    name: "Redwood Shores",
+    description: "Lagoon views & tech company headquarters",
+    url: "https://www.redfin.com/neighborhood/115895/CA/Redwood-City/Redwood-Shores",
+    image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80",
+  },
+  {
+    name: "Redwood City",
+    description: "Climate best by government test",
+    url: "https://www.redfin.com/city/15525/CA/Redwood-City",
+    image: "https://images.unsplash.com/photo-1605276374104-dee2a0ed3cd6?w=800&q=80",
+  },
+  {
+    name: "Menlo Park",
+    description: "Home of Meta & Stanford neighbors",
+    url: "https://www.redfin.com/city/11961/CA/Menlo-Park",
+    image: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&q=80",
+  },
 ];
 
 export default function Home() {
@@ -335,7 +371,7 @@ export default function Home() {
             </div>
           </ScrollReveal>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {neighborhoods.map((neighborhood, index) => (
               <ScrollReveal key={neighborhood.name} delay={index * 100}>
                 <a
