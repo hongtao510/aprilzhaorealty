@@ -187,7 +187,7 @@ export function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="bg-neutral-900 text-white mt-auto">
+    <footer className="bg-[#eae6e1] text-neutral-900 mt-auto border-t border-neutral-200">
       {/* Main Footer */}
       <div className="max-w-7xl mx-auto px-6 lg:px-8 py-16">
         <div className="grid md:grid-cols-4 gap-12">
@@ -197,7 +197,7 @@ export function Footer() {
               <span className="text-[#d4a012]">April</span> Zhao
             </div>
             <p className="text-[#d4a012] text-xs tracking-[0.2em] uppercase mb-6">Expertise. Ethics. Excellence.</p>
-            <p className="text-neutral-400 text-sm leading-relaxed max-w-md mb-8">
+            <p className="text-neutral-500 text-sm leading-relaxed max-w-md mb-8">
               Helping families find their perfect home with personalized service, deep local expertise, and a commitment to excellence.
             </p>
             <div className="flex items-end gap-4 mb-8">
@@ -208,7 +208,7 @@ export function Footer() {
                 height={28}
                 className="object-contain"
               />
-              <span className="text-neutral-400 text-sm pb-1">CalBRE# 01929787</span>
+              <span className="text-neutral-500 text-sm pb-1">CalBRE# 01929787</span>
             </div>
 
           </div>
@@ -218,27 +218,27 @@ export function Footer() {
             <h4 className="text-xs font-medium uppercase tracking-widest text-[#d4a012] mb-8">Navigation</h4>
             <ul className="space-y-4">
               <li>
-                <Link href="/" className="text-neutral-400 hover:text-white transition-colors text-sm uppercase tracking-wider">
+                <Link href="/" className="text-neutral-500 hover:text-neutral-900 transition-colors text-sm uppercase tracking-wider">
                   Home
                 </Link>
               </li>
               <li>
-                <Link href="/listings" className="text-neutral-400 hover:text-white transition-colors text-sm uppercase tracking-wider">
+                <Link href="/listings" className="text-neutral-500 hover:text-neutral-900 transition-colors text-sm uppercase tracking-wider">
                   Transactions
                 </Link>
               </li>
               <li>
-                <Link href="/testimonials" className="text-neutral-400 hover:text-white transition-colors text-sm uppercase tracking-wider">
+                <Link href="/testimonials" className="text-neutral-500 hover:text-neutral-900 transition-colors text-sm uppercase tracking-wider">
                   Testimonials
                 </Link>
               </li>
               <li>
-                <Link href="/about" className="text-neutral-400 hover:text-white transition-colors text-sm uppercase tracking-wider">
+                <Link href="/about" className="text-neutral-500 hover:text-neutral-900 transition-colors text-sm uppercase tracking-wider">
                   About
                 </Link>
               </li>
               <li>
-                <Link href="/contact" className="text-neutral-400 hover:text-white transition-colors text-sm uppercase tracking-wider">
+                <Link href="/contact" className="text-neutral-500 hover:text-neutral-900 transition-colors text-sm uppercase tracking-wider">
                   Contact
                 </Link>
               </li>
@@ -252,7 +252,7 @@ export function Footer() {
               <li>
                 <a
                   href="mailto:aprilcasf@gmail.com"
-                  className="text-neutral-400 hover:text-[#d4a012] transition-colors text-sm flex items-center gap-2"
+                  className="text-neutral-500 hover:text-[#d4a012] transition-colors text-sm flex items-center gap-2"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
@@ -263,7 +263,7 @@ export function Footer() {
               <li>
                 <a
                   href="tel:650-200-5221"
-                  className="text-neutral-400 hover:text-[#d4a012] transition-colors text-sm flex items-center gap-2"
+                  className="text-neutral-500 hover:text-[#d4a012] transition-colors text-sm flex items-center gap-2"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
@@ -277,12 +277,12 @@ export function Footer() {
       </div>
 
       {/* Bottom Bar */}
-      <div className="border-t border-neutral-800">
+      <div className="border-t border-neutral-200">
         <div className="max-w-7xl mx-auto px-6 lg:px-8 py-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <p className="text-xs text-neutral-500 uppercase tracking-wider">
+          <p className="text-xs text-neutral-400 uppercase tracking-wider">
             &copy; {currentYear} April Zhao Realty
           </p>
-          <div className="flex items-center gap-6 text-xs text-neutral-500 uppercase tracking-wider">
+          <div className="flex items-center gap-6 text-xs text-neutral-400 uppercase tracking-wider">
             <span>California Real Estate License #02157957</span>
           </div>
         </div>
@@ -310,7 +310,7 @@ export function ScrollToTop() {
   return (
     <button
       onClick={scrollToTop}
-      className={`fixed bottom-8 right-8 z-50 w-12 h-12 bg-neutral-900 text-white flex items-center justify-center transition-all duration-300 hover:bg-[#d4a012] shadow-lg ${
+      className={`fixed bottom-8 right-8 z-50 w-12 h-12 bg-[#d4a012] text-white flex items-center justify-center transition-all duration-300 hover:bg-[#b8890f] shadow-lg ${
         visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
       }`}
       aria-label="Scroll to top"

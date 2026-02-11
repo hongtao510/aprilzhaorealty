@@ -13,19 +13,19 @@ export default function ListingsPage() {
   return (
     <div className="bg-white">
       {/* Hero Section - Elegant minimal */}
-      <section className="relative bg-neutral-900 py-24 md:py-32">
+      <section className="relative bg-[#eae6e1] py-24 md:py-32 border-b border-neutral-200">
         {/* Subtle pattern */}
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute inset-0" style={{backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '40px 40px'}} />
+        <div className="absolute inset-0 opacity-[0.03]">
+          <div className="absolute inset-0" style={{backgroundImage: 'radial-gradient(circle at 2px 2px, #1a1a1a 1px, transparent 0)', backgroundSize: '40px 40px'}} />
         </div>
 
         <div className="max-w-7xl mx-auto px-6 lg:px-8 relative z-10">
           <div className="max-w-3xl">
-            <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl text-white mb-6">
+            <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl text-neutral-900 mb-6">
               Property Portfolio
             </h1>
             <div className="w-20 h-0.5 bg-[#d4a012] mb-8" />
-            <p className="text-lg text-neutral-400 max-w-2xl leading-relaxed">
+            <p className="text-lg text-neutral-500 max-w-2xl leading-relaxed">
               Explore my upcoming listings and featured closed transactions across the Bay Area.
             </p>
           </div>
@@ -245,20 +245,20 @@ export default function ListingsPage() {
       </div>
 
       {/* CTA Section */}
-      <section className="py-24 bg-neutral-900 relative overflow-hidden">
+      <section className="py-24 bg-[#eae6e1] relative overflow-hidden border-t border-neutral-200">
         {/* Subtle pattern */}
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute inset-0" style={{backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '40px 40px'}} />
+        <div className="absolute inset-0 opacity-[0.03]">
+          <div className="absolute inset-0" style={{backgroundImage: 'radial-gradient(circle at 2px 2px, #1a1a1a 1px, transparent 0)', backgroundSize: '40px 40px'}} />
         </div>
 
         <div className="max-w-4xl mx-auto px-6 lg:px-8 relative z-10 text-center">
           <ScrollReveal>
             <p className="text-[#d4a012] text-xs uppercase tracking-[0.3em] mb-6">Ready to Get Started?</p>
-            <h2 className="font-serif text-4xl md:text-5xl text-white mb-6">
+            <h2 className="font-serif text-4xl md:text-5xl text-neutral-900 mb-6">
               Let&apos;s Find Your Perfect Home
             </h2>
             <div className="w-20 h-0.5 bg-[#d4a012] mx-auto mb-8" />
-            <p className="text-neutral-400 mb-10 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-neutral-500 mb-10 max-w-2xl mx-auto leading-relaxed">
               Whether you&apos;re buying your first home, selling a property, or exploring investment opportunities, I&apos;m here to support you every step of the way.
             </p>
           </ScrollReveal>

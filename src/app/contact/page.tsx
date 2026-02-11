@@ -64,10 +64,10 @@ export default function ContactPage() {
   return (
     <div className="bg-white">
       {/* Hero Section */}
-      <section className="relative bg-neutral-900 py-24 md:py-32 overflow-hidden">
+      <section className="relative bg-[#eae6e1] py-24 md:py-32 overflow-hidden border-b border-neutral-200">
         {/* Subtle pattern */}
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute inset-0" style={{backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '40px 40px'}} />
+        <div className="absolute inset-0 opacity-[0.03]">
+          <div className="absolute inset-0" style={{backgroundImage: 'radial-gradient(circle at 2px 2px, #1a1a1a 1px, transparent 0)', backgroundSize: '40px 40px'}} />
         </div>
 
         {/* Decorative line */}
@@ -78,7 +78,7 @@ export default function ContactPage() {
             <p className="text-[#d4a012] text-xs uppercase tracking-[0.3em] mb-6">
               Get in Touch
             </p>
-            <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl text-white mb-6">
+            <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl text-neutral-900 mb-6">
               Let&apos;s Start Your Journey
             </h1>
             <div className="w-20 h-0.5 bg-[#d4a012] mb-8" />
@@ -252,7 +252,7 @@ export default function ContactPage() {
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="px-12 py-4 bg-neutral-900 text-white text-xs font-medium uppercase tracking-[0.15em] hover:bg-[#d4a012] transition-all duration-300 disabled:opacity-50"
+                    className="px-12 py-4 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-[0.15em] hover:bg-[#b8890f] transition-all duration-300 disabled:opacity-50"
                   >
                     {isSubmitting ? "Sending..." : "Send Message"}
                   </button>

@@ -8,9 +8,9 @@ export default function AboutPage() {
   return (
     <div>
       {/* Hero - Editorial Style */}
-      <section className="min-h-[60vh] bg-neutral-900 text-white flex items-center relative overflow-hidden">
+      <section className="min-h-[60vh] bg-[#eae6e1] text-neutral-900 flex items-center relative overflow-hidden border-b border-neutral-200">
         {/* Large decorative letter */}
-        <div className="absolute -right-20 top-1/2 -translate-y-1/2 text-[40rem] font-serif text-white/[0.02] leading-none select-none pointer-events-none">
+        <div className="absolute -right-20 top-1/2 -translate-y-1/2 text-[40rem] font-serif text-neutral-900/[0.02] leading-none select-none pointer-events-none">
           A
         </div>
 
@@ -61,7 +61,7 @@ export default function AboutPage() {
 
                 <Link
                   href="/contact"
-                  className="inline-block px-8 py-4 bg-neutral-900 text-white text-xs font-medium uppercase tracking-[0.15em] hover:bg-[#d4a012] transition-all duration-300"
+                  className="inline-block px-8 py-4 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-[0.15em] hover:bg-[#b8890f] transition-all duration-300"
                 >
                   Let&apos;s Connect
                 </Link>

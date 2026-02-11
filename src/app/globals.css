@@ -5,12 +5,12 @@
   --foreground: #1a1a1a;
 
   /* Luxury Minimalist Color Palette - Higher Contrast Gold */
-  --primary: #1a1a1a;
-  --primary-hover: #000000;
+  --primary: #d4a012;
+  --primary-hover: #b8890f;
   --gold: #d4a012;
   --gold-light: #e6b52a;
   --gold-dark: #b8890f;
-  --warm-white: #faf9f7;
+  --warm-white: #eae6e1;
   --light-gray: #f5f5f5;
   --medium-gray: #e5e5e5;
   --text-gray: #737373;
@@ -46,7 +46,7 @@ body {
 /* Improved selection color */
 ::selection {
   background: var(--gold);
-  color: var(--primary);
+  color: white;
 }
 
 /* Smooth scrolling with reduced motion preference support */
@@ -63,7 +63,7 @@ body {
 
 /* Gradient text utility - luxury version */
 .gradient-text {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--gold) 100%);
+  background: linear-gradient(135deg, #1a1a1a 0%, var(--gold) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -164,8 +164,8 @@ button:disabled {
 .btn-border {
   padding: 14px 32px;
   background: transparent;
-  border: 2px solid var(--primary);
-  color: var(--primary);
+  border: 2px solid #1a1a1a;
+  color: #1a1a1a;
   font-weight: 500;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -175,6 +175,7 @@ button:disabled {
 
 .btn-border:hover {
   background: var(--primary);
+  border-color: var(--primary);
   color: white;
 }
 

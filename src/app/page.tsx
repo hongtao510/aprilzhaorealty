@@ -30,7 +30,7 @@ const neighborhoodsRow1 = [
   {
     name: "Hillsborough",
     description: "Prestigious estates",
-    url: "https://www.redfin.com/city/8293/CA/Hillsborough",
+    url: "https://www.redfin.com/city/8642/CA/Hillsborough",
     image: "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=800&q=80",
   },
   {
@@ -449,13 +449,13 @@ export default function Home() {
             <div className="flex flex-wrap justify-center gap-4">
               <Link
                 href="/contact"
-                className="px-10 py-4 bg-neutral-900 text-white text-xs font-medium uppercase tracking-[0.15em] hover:bg-[#d4a012] transition-all duration-300"
+                className="px-10 py-4 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-[0.15em] hover:bg-[#b8890f] transition-all duration-300"
               >
                 Contact Me
               </Link>
               <a
                 href="mailto:aprilcasf@gmail.com"
-                className="px-10 py-4 border-2 border-neutral-900 text-neutral-900 text-xs font-medium uppercase tracking-[0.15em] hover:bg-neutral-900 hover:text-white transition-all duration-300"
+                className="px-10 py-4 border-2 border-[#d4a012] text-[#d4a012] text-xs font-medium uppercase tracking-[0.15em] hover:bg-[#d4a012] hover:text-white transition-all duration-300"
               >
                 Email Directly
               </a>
