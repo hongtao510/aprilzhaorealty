@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     const agentEmail = process.env.CONTACT_EMAIL || "aprilcasf@gmail.com";
 
     const { error: sendError } = await resend.emails.send({
-      from: "April Zhao Realty <onboarding@resend.dev>",
+      from: "April Zhao Realty <noreply@aprilzhaohome.com>",
       to: [agentEmail],
       cc: [toEmail],
       replyTo: agentEmail,

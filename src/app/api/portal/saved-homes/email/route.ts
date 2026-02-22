@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     // to the verified account email. Send to the agent with the recipient CC'd.
     // Once a custom domain is verified in Resend, switch to: to: [body.recipientEmail]
     const { data, error } = await resend.emails.send({
-      from: "April Zhao Realty <onboarding@resend.dev>",
+      from: "April Zhao Realty <noreply@aprilzhaohome.com>",
       to: [agentEmail],
       cc: [body.recipientEmail],
       replyTo,
