@@ -40,6 +40,7 @@ export default function SavedHomesPage() {
   const [emailComments, setEmailComments] = useState<Map<string, string>>(new Map());
   const [recipientEmail, setRecipientEmail] = useState("");
   const [emailSubject, setEmailSubject] = useState("");
+  const [emailMessage, setEmailMessage] = useState("");
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [emailError, setEmailError] = useState("");
@@ -157,6 +158,7 @@ export default function SavedHomesPage() {
       setEmailComments(new Map());
       setRecipientEmail("");
       setEmailSubject("");
+      setEmailMessage("");
       setEmailSent(false);
       setEmailError("");
       setShowRoutePlanner(false);
@@ -203,6 +205,7 @@ export default function SavedHomesPage() {
     const payload = {
       recipientEmail,
       subject: emailSubject.trim() || undefined,
+      message: emailMessage.trim() || undefined,
       homes: selectedHomes.map((h) => ({
         id: h.id,
         url: h.url,
@@ -428,6 +431,18 @@ export default function SavedHomesPage() {
                         className="w-full px-3 py-2 border border-neutral-300 text-sm focus:outline-none focus:border-[#d4a012] transition-colors"
                       />
                     </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-1.5">
+                      Personal Message <span className="normal-case tracking-normal text-neutral-400">(optional)</span>
+                    </label>
+                    <textarea
+                      value={emailMessage}
+                      onChange={(e) => setEmailMessage(e.target.value)}
+                      placeholder="Hi! Here are some homes I thought you might like..."
+                      rows={3}
+                      className="w-full px-3 py-2 border border-neutral-300 text-sm focus:outline-none focus:border-[#d4a012] transition-colors resize-none"
+                    />
                   </div>
                   {emailError && (
                     <p className="text-xs text-red-500 -mt-2">{emailError}</p>

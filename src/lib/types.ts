@@ -94,3 +94,37 @@ export interface SavedHomePreview {
   address: string | null;
   price: string | null;
 }
+
+export interface CandidateHome {
+  id: string;
+  url: string;
+  title: string | null;
+  image_url: string | null;
+  address: string | null;
+  price: string | null;
+  price_numeric: number | null;
+  beds: number | null;
+  baths: number | null;
+  sqft: number | null;
+  status: "new" | "saved" | "sent" | "dismissed";
+  source: "redfin" | "manual";
+  search_criteria_id: string | null;
+  sent_to_client_id: string | null;
+  sent_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SearchCriteria {
+  id: string;
+  label: string;
+  region_id: string;
+  region_type: number;
+  min_price: number | null;
+  max_price: number | null;
+  property_types: string[] | null;
+  min_beds: number | null;
+  min_baths: number | null;
+  is_active: boolean;
+}

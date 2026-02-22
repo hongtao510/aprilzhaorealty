@@ -18,19 +18,13 @@ export default function PortalHeader() {
       </Link>
 
       <div className="flex items-center gap-4">
-        {profile && (
+        {profile?.role === "admin" && (
           <nav className="hidden sm:flex items-center gap-1 mr-2">
             <Link
-              href="/portal/search"
+              href="/admin"
               className="px-3 py-1.5 text-xs uppercase tracking-wider text-neutral-500 hover:text-[#d4a012] transition-colors"
             >
-              Search
-            </Link>
-            <Link
-              href="/portal/saved-homes"
-              className="px-3 py-1.5 text-xs uppercase tracking-wider text-neutral-500 hover:text-[#d4a012] transition-colors"
-            >
-              Saved Homes
+              Admin
             </Link>
           </nav>
         )}

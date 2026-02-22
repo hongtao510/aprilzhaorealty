@@ -9,6 +9,8 @@ const publicRoutes = [
   "/testimonials",
   "/api/contact",
   "/api/auth",
+  "/api/cron",
+  "/api/newsletter",
 ];
 
 function isPublicRoute(pathname: string) {

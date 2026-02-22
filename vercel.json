@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/candidate-homes",
+      "schedule": "0 14 * * *"
+    }
+  ]
+}
