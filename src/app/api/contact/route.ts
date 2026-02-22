@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await resend.emails.send({
       from: "April Zhao Realty <noreply@aprilzhaohome.com>",
       to: [recipientEmail],
-      replyTo: body.email,
+      replyTo: recipientEmail,
       subject: `New Contact Form Submission from ${body.name}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">

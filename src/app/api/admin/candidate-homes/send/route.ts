@@ -92,8 +92,8 @@ export async function POST(request: NextRequest) {
 
     const { error: sendError } = await resend.emails.send({
       from: "April Zhao Realty <noreply@aprilzhaohome.com>",
-      to: [agentEmail],
-      cc: [toEmail],
+      to: [toEmail],
+      cc: [agentEmail],
       replyTo: agentEmail,
       subject: emailSubject,
       html: buildEmailHtml(emailHomes, message),
