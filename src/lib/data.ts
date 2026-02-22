@@ -3,6 +3,21 @@ import { Listing, Testimonial } from "./types";
 // April Zhao's real transactions from MLS
 export const listings: Listing[] = [
   {
+    id: "23",
+    address: "1220 Irwin St",
+    city: "Belmont, CA 94002",
+    price: 1888000,
+    bedrooms: 3,
+    bathrooms: 1.5,
+    sqft: 1490,
+    status: "pending",
+    images: ["/images/1220_Irwin_St.jpg"],
+    description: "Single family home in Belmont.",
+    yearBuilt: 1947,
+    propertyType: "Single Family",
+    mlsLink: "https://www.redfin.com/CA/Belmont/1220-Irwin-St-94002/home/1801223",
+  },
+  {
     id: "1",
     address: "176 Waters Park Cir",
     city: "San Mateo, CA 94403",

@@ -42,3 +42,55 @@ export interface Testimonial {
   content: string;
   createdAt: string;
 }
+
+export interface Profile {
+  id: string;
+  email: string;
+  full_name: string;
+  phone: string | null;
+  role: "admin" | "client";
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Material {
+  id: string;
+  client_id: string;
+  file_name: string;
+  file_path: string;
+  file_size: number;
+  file_type: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Message {
+  id: string;
+  client_id: string;
+  sender_id: string;
+  content: string;
+  is_read: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SavedHome {
+  id: string;
+  client_id: string;
+  url: string;
+  title: string | null;
+  image_url: string | null;
+  address: string | null;
+  price: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SavedHomePreview {
+  title: string | null;
+  image_url: string | null;
+  address: string | null;
+  price: string | null;
+}

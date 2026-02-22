@@ -8,6 +8,7 @@ import ScrollReveal from "@/components/ScrollReveal";
 export default function ListingsPage() {
   const listings = getListings();
   const activeListings = listings.filter((l) => l.status === "active");
+  const pendingListings = listings.filter((l) => l.status === "pending");
   const soldListings = listings.filter((l) => l.status === "sold");
 
   return (
@@ -115,6 +116,7 @@ export default function ListingsPage() {
             </div>
           </ScrollReveal>
 
+          {/* Coming Soon Listings */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             <ScrollReveal delay={0}>
               <div className="bg-neutral-50 p-8 border border-neutral-200 hover:border-[#d4a012] transition-colors">
@@ -133,22 +135,6 @@ export default function ListingsPage() {
             </ScrollReveal>
 
             <ScrollReveal delay={100}>
-              <div className="bg-neutral-50 p-8 border border-neutral-200 hover:border-[#d4a012] transition-colors">
-                <div className="mb-4">
-                  <span className="px-3 py-1 bg-[#d4a012]/10 text-[#d4a012] text-xs uppercase tracking-[0.15em]">
-                    Coming Soon
-                  </span>
-                </div>
-                <h3 className="font-serif text-xl text-neutral-900 mb-2">Single Family in Belmont</h3>
-                <p className="text-neutral-500 text-sm mb-4">Belmont, CA</p>
-                <div className="flex items-center gap-6 text-sm text-neutral-600">
-                  <span>3 Beds</span>
-                  <span>1.5 Baths</span>
-                </div>
-              </div>
-            </ScrollReveal>
-
-            <ScrollReveal delay={200}>
               <div className="bg-neutral-50 p-8 border border-neutral-200 hover:border-[#d4a012] transition-colors">
                 <div className="mb-4">
                   <span className="px-3 py-1 bg-[#d4a012]/10 text-[#d4a012] text-xs uppercase tracking-[0.15em]">
@@ -180,7 +166,7 @@ export default function ListingsPage() {
           </ScrollReveal>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {soldListings.map((listing, index) => (
+            {[...pendingListings, ...soldListings].map((listing, index) => (
               <ScrollReveal key={listing.id} delay={(index % 3) * 100}>
                 <Link
                   href={`/listings/${listing.id}`}
@@ -206,8 +192,8 @@ export default function ListingsPage() {
 
                     {/* Status Badge */}
                     <div className="absolute top-4 left-4">
-                      <span className="px-4 py-2 bg-neutral-900 text-white text-xs uppercase tracking-[0.15em]">
-                        Sold
+                      <span className={`px-4 py-2 text-white text-xs uppercase tracking-[0.15em] ${listing.status === "pending" ? "bg-[#d4a012]" : "bg-neutral-900"}`}>
+                        {listing.status === "pending" ? "Pending" : "Sold"}
                       </span>
                     </div>
 

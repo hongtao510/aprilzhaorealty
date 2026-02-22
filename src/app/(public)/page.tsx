@@ -92,7 +92,7 @@ export default function Home() {
   // Filter listings that have images for the carousel
   const listingsWithImages = allListings.filter((listing) => listing.images.length > 0);
   const carouselListings = listingsWithImages.slice(0, 8); // Show up to 8 listings in carousel
-  const recentListings = allListings.slice(0, 9);
+  const recentListings = allListings.filter((l) => l.status === "sold" || l.status === "pending").slice(0, 9);
 
   const [currentSlide, setCurrentSlide] = useState(0);
 
@@ -252,22 +252,6 @@ export default function Home() {
                     Coming Soon
                   </span>
                 </div>
-                <h3 className="font-serif text-xl text-neutral-900 mb-2">Single Family in Belmont</h3>
-                <p className="text-neutral-500 text-sm mb-4">Belmont, CA</p>
-                <div className="flex items-center gap-6 text-sm text-neutral-600">
-                  <span>3 Beds</span>
-                  <span>1.5 Baths</span>
-                </div>
-              </div>
-            </ScrollReveal>
-
-            <ScrollReveal delay={200}>
-              <div className="bg-neutral-50 p-8 border border-neutral-200 hover:border-[#d4a012] transition-colors">
-                <div className="mb-4">
-                  <span className="px-3 py-1 bg-[#d4a012]/10 text-[#d4a012] text-xs uppercase tracking-[0.15em]">
-                    Coming Soon
-                  </span>
-                </div>
                 <h3 className="font-serif text-xl text-neutral-900 mb-2">Single Family in San Francisco</h3>
                 <p className="text-neutral-500 text-sm mb-4">San Francisco, CA</p>
                 <div className="flex items-center gap-6 text-sm text-neutral-600">
@@ -332,8 +316,8 @@ export default function Home() {
 
                     {/* Status Badge */}
                     <div className="absolute top-4 left-4">
-                      <span className="px-4 py-2 bg-neutral-900 text-white text-xs uppercase tracking-[0.15em]">
-                        Sold
+                      <span className={`px-4 py-2 text-white text-xs uppercase tracking-[0.15em] ${listing.status === "pending" ? "bg-[#d4a012]" : "bg-neutral-900"}`}>
+                        {listing.status === "pending" ? "Pending" : "Sold"}
                       </span>
                     </div>
                   </div>

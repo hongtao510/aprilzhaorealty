@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
-import { Header, Footer, ScrollToTop } from "@/components/ClientLayout";
 import { AgentStructuredData } from "@/components/StructuredData";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics";
+import { AuthProvider } from "@/components/auth/AuthProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -108,10 +108,9 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${playfair.variable} font-sans antialiased min-h-screen flex flex-col bg-white`}
       >
-        <Header />
-        <main className="flex-1 pt-20">{children}</main>
-        <Footer />
-        <ScrollToTop />
+        <AuthProvider>
+          {children}
+        </AuthProvider>
         <Analytics />
       </body>
     </html>

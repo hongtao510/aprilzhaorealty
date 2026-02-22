@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -22,6 +23,7 @@ export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
+  const { profile } = useAuth();
 
   // Handle scroll effect
   useEffect(() => {
@@ -51,6 +53,7 @@ export function Header() {
 
   const navLinks = [
     { href: "/listings", label: "Properties" },
+    { href: "/portal/search", label: "Search" },
     { href: "/testimonials", label: "Testimonials" },
     { href: "/about", label: "About" },
     { href: "/contact", label: "Contact" },
@@ -78,7 +81,7 @@ export function Header() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            {navLinks.slice(0, 3).map((link) => (
+            {navLinks.slice(0, 4).map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
@@ -104,6 +107,29 @@ export function Header() {
             >
               Contact
             </Link>
+            {profile && (
+              <Link
+                href="/portal/saved-homes"
+                className={`text-sm font-medium uppercase tracking-widest transition-colors relative ${
+                  isActive("/portal/saved-homes")
+                    ? "text-neutral-900"
+                    : "text-neutral-600 hover:text-neutral-900"
+                }`}
+              >
+                Saved Homes
+                {isActive("/portal/saved-homes") && (
+                  <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-[#d4a012]" />
+                )}
+              </Link>
+            )}
+            {profile && (
+              <Link
+                href={profile.role === "admin" ? "/admin" : "/portal"}
+                className="px-6 py-3 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-widest hover:bg-[#b8890f] transition-all duration-300"
+              >
+                {profile.role === "admin" ? "Admin" : "My Portal"}
+              </Link>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -158,6 +184,38 @@ export function Header() {
               </Link>
             ))}
           </nav>
+
+          {/* Portal Links in Mobile Menu */}
+          {profile && (
+            <Link
+              href="/portal/saved-homes"
+              className={`mt-4 text-xl font-light uppercase tracking-widest transition-colors ${
+                isActive("/portal/saved-homes") ? "text-[#d4a012]" : "text-neutral-900 hover:text-[#d4a012]"
+              }`}
+              style={{
+                transitionDelay: mobileMenuOpen ? `${navLinks.length * 100}ms` : "0ms",
+                transform: mobileMenuOpen ? "translateY(0)" : "translateY(20px)",
+                opacity: mobileMenuOpen ? 1 : 0,
+                transition: "all 0.3s ease",
+              }}
+            >
+              Saved Homes
+            </Link>
+          )}
+          {profile && (
+            <Link
+              href={profile.role === "admin" ? "/admin" : "/portal"}
+              className="mt-4 px-8 py-3 bg-[#d4a012] text-white text-sm uppercase tracking-widest hover:bg-[#b8890f] transition-all duration-300"
+              style={{
+                transitionDelay: mobileMenuOpen ? `${(navLinks.length + 1) * 100}ms` : "0ms",
+                transform: mobileMenuOpen ? "translateY(0)" : "translateY(20px)",
+                opacity: mobileMenuOpen ? 1 : 0,
+                transition: "all 0.3s ease",
+              }}
+            >
+              {profile.role === "admin" ? "Admin Portal" : "My Portal"}
+            </Link>
+          )}
 
           {/* Contact Info in Mobile Menu */}
           <div

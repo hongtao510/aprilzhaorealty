@@ -1,25 +1,12 @@
-import { createClient } from "@supabase/supabase-js";
+// Backward-compatibility wrapper — existing comment functions
+// New code should import from @/lib/supabase/client, server, or admin
 
-// To set up Supabase:
-// 1. Create a free account at https://supabase.com
-// 2. Create a new project
-// 3. Go to Settings > API and copy your URL and anon key
-// 4. Create a .env.local file with:
-//    NEXT_PUBLIC_SUPABASE_URL=your-project-url
-//    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-// 5. Create a "comments" table with columns:
-//    - id (uuid, primary key)
-//    - listing_id (text)
-//    - author (text)
-//    - content (text)
-//    - created_at (timestamp with timezone, default now())
+import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-// Comment functions for when you're ready to use Supabase:
 
 export async function getComments(listingId: string) {
   const { data, error } = await supabase
