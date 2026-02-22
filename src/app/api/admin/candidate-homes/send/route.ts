@@ -48,10 +48,11 @@ export async function POST(request: NextRequest) {
   const { data: candidates, error: candidatesError } = await supabase
     .from("candidate_homes")
     .select("*")
-    .in("id", candidateIds);
+    .in("id", candidateIds)
+    .neq("status", "dismissed");
 
   if (candidatesError || !candidates?.length) {
-    return NextResponse.json({ error: "Failed to fetch candidates" }, { status: 500 });
+    return NextResponse.json({ error: "No eligible candidates to send (dismissed homes are excluded)" }, { status: 400 });
   }
 
   // Determine recipient email
