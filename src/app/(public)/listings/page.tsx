@@ -42,7 +42,7 @@ export default function ListingsPage() {
                 <div>
                   <p className="text-[#d4a012] text-xs uppercase tracking-[0.3em] mb-2">Available Now</p>
                   <h2 className="font-serif text-3xl text-neutral-900">
-                    {activeListings.length} {activeListings.length === 1 ? 'Property' : 'Properties'} for Sale
+                    Properties for Sale
                   </h2>
                 </div>
               </div>
@@ -61,7 +61,7 @@ export default function ListingsPage() {
                           src={listing.images[0]}
                           alt={listing.address}
                           fill
-                          className="object-cover transition-transform duration-700 group-hover:scale-105"
+                          className="object-cover object-[50%_10%] transition-transform duration-700 group-hover:scale-105"
                         />
                       ) : (
                         <div className="absolute inset-0 flex flex-col items-center justify-center text-neutral-300">
@@ -138,7 +138,7 @@ export default function ListingsPage() {
                         src={listing.images[0]}
                         alt={listing.address}
                         fill
-                        className="object-cover transition-transform duration-700 group-hover:scale-105"
+                        className="object-cover object-[50%_10%] transition-transform duration-700 group-hover:scale-105"
                       />
                     )}
                     {/* Hover overlay with arrow */}

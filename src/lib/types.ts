@@ -14,6 +14,8 @@ export interface Listing {
   propertyType?: string;
   mlsLink?: string;
   mlsNumber?: string;
+  videoLink?: string;
+  zillowLink?: string;
   hoaFees?: number;
   garage?: string;
   heating?: string;

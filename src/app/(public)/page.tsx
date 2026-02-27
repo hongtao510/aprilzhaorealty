@@ -251,7 +251,7 @@ export default function Home() {
                           src={listing.images[0]}
                           alt={listing.address}
                           fill
-                          className="object-cover transition-transform duration-700 group-hover:scale-105"
+                          className="object-cover object-[50%_10%] transition-transform duration-700 group-hover:scale-105"
                         />
                       ) : (
                         <div className="absolute inset-0 flex flex-col items-center justify-center text-neutral-300">
@@ -341,7 +341,7 @@ export default function Home() {
                         src={listing.images[0]}
                         alt={listing.address}
                         fill
-                        className="object-cover transition-transform duration-700 group-hover:scale-105"
+                        className="object-cover object-[50%_10%] transition-transform duration-700 group-hover:scale-105"
                       />
                     )}
                     {/* Hover overlay with arrow */}

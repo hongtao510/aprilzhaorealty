@@ -247,23 +247,6 @@ export default async function ListingPage({
               </div>
             )}
 
-            {/* Appliances Section */}
-            {listing.appliances && listing.appliances.length > 0 && (
-              <div className="mb-12">
-                <h2 className="text-xl md:text-2xl font-bold text-zinc-900 mb-6 flex items-center gap-3">
-                  <span className="w-1 h-6 bg-[#86efac] rounded-full" />
-                  Appliances Included
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                  {listing.appliances.map((appliance, i) => (
-                    <div key={i} className="flex items-center gap-3 p-3 bg-zinc-50 rounded-xl hover:bg-[#86efac]/10 transition-colors">
-                      <div className="w-2 h-2 bg-[#86efac] rounded-full flex-shrink-0" />
-                      <span className="text-zinc-700">{appliance}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* Schools Section */}
             {listing.schools && (listing.schools.elementary || listing.schools.highSchool) && (
@@ -317,8 +300,10 @@ export default async function ListingPage({
                     <p className="text-xs text-neutral-500">BQ Realty</p>
                   </div>
                 </div>
-                <p className="text-sm text-zinc-600 mb-6 leading-relaxed">
-                  Interested in this property? I&apos;d love to help you schedule a viewing or answer any questions you may have.
+                <p className="text-sm text-zinc-600 mb-6 leading-relaxed text-center">
+                  Interested in a similar property?
+                  <br />
+                  I&apos;d love to help.
                 </p>
                 <Link
                   href="/contact"
@@ -338,16 +323,23 @@ export default async function ListingPage({
               <div className="space-y-3">
                 <button className="w-full py-3.5 px-4 bg-white border-2 border-zinc-100 rounded-xl font-medium hover:border-[#86efac] hover:bg-[#86efac]/5 transition-all duration-300 flex items-center justify-center gap-3 text-zinc-700">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                  </svg>
-                  Save This Property
-                </button>
-                <button className="w-full py-3.5 px-4 bg-white border-2 border-zinc-100 rounded-xl font-medium hover:border-[#86efac] hover:bg-[#86efac]/5 transition-all duration-300 flex items-center justify-center gap-3 text-zinc-700">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                   </svg>
                   Share Listing
                 </button>
+                {listing.videoLink && (
+                  <a
+                    href={listing.videoLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-3.5 px-4 bg-white border-2 border-zinc-100 rounded-xl font-medium hover:border-[#ef4444] hover:bg-[#ef4444]/5 transition-all duration-300 flex items-center justify-center gap-3 text-zinc-700"
+                  >
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                    Watch Video Tour
+                  </a>
+                )}
                 {listing.mlsLink && (
                   <a
                     href={listing.mlsLink}
@@ -358,7 +350,20 @@ export default async function ListingPage({
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                     </svg>
-                    View on MLS
+                    View on Redfin
+                  </a>
+                )}
+                {listing.zillowLink && (
+                  <a
+                    href={listing.zillowLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-3.5 px-4 bg-white border-2 border-zinc-100 rounded-xl font-medium hover:border-[#006aff] hover:bg-[#006aff]/5 transition-all duration-300 flex items-center justify-center gap-3 text-zinc-700"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    View on Zillow
                   </a>
                 )}
               </div>

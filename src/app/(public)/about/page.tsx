@@ -73,10 +73,10 @@ export default function AboutPage() {
               <ScrollReveal delay={100}>
                 <div className="space-y-6 text-neutral-600 text-lg leading-relaxed">
                   <p>
-                    April has lived and worked in the Peninsula and San Francisco for many years, developing deep knowledge of local market dynamics and strong community insights. Holding a Ph.D. in business, April is trained to make analytical and strategic decisions grounded in ethics and integrity, providing honest, intelligence-driven guidance and support her clients can trust.
+                    April has resided on the Peninsula and in San Francisco for over ten years, developing deep knowledge of local market dynamics and strong community insight. Holding a Ph.D. in business, she brings rigorous analytical training and strategic decision-making grounded in ethics and integrity, providing honest, intelligence-driven guidance and support her clients can trust.
                   </p>
                   <p>
-                    April advocates tirelessly for her clients at every stage of the process, ensuring they make confident, well-informed decisions. She is committed to delivering exceptional, personalized service tailored to each client and consistently exceeding expectations to achieve the best possible outcomes.
+                    April advocates tirelessly for her clients at every stage of the process, ensuring they make confident, well-informed decisions. She is committed to delivering exceptional, attentive service tailored to each client&apos;s goals and consistently exceeding expectations to achieve the best possible outcomes.
                   </p>
                   <p className="text-neutral-900 font-medium">
                     From A to Z, April is here to ensure your buying or selling journey is seamless, informed, and successful.
