@@ -30,7 +30,7 @@ export default async function ListingPage({
             src={listing.images[0]}
             alt={listing.address}
             fill
-            className="object-cover"
+            className="object-cover object-right"
             priority
           />
         )}
