@@ -292,7 +292,7 @@ export default function Home() {
 
                       <div className="flex items-center gap-6 text-sm text-neutral-600">
                         <span>{listing.bedrooms} Beds</span>
-                        <span>{listing.bathrooms} Baths</span>
+                        <span>{listing.bathrooms} {listing.bathrooms === 1 ? "Bath" : "Baths"}</span>
                         {listing.sqft > 0 && <span>{listing.sqft.toLocaleString()} Sqft</span>}
                       </div>
                     </div>
@@ -373,7 +373,7 @@ export default function Home() {
                     {/* Property Details */}
                     <div className="flex items-center gap-6 text-sm text-neutral-600">
                       <span>{listing.bedrooms} Beds</span>
-                      <span>{listing.bathrooms} Baths</span>
+                      <span>{listing.bathrooms} {listing.bathrooms === 1 ? "Bath" : "Baths"}</span>
                       <span>{listing.sqft.toLocaleString()} Sqft</span>
                     </div>
                   </div>

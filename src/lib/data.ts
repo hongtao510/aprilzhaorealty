@@ -38,7 +38,7 @@ export const listings: Listing[] = [
     bathrooms: 1,
     sqft: 0,
     status: "active",
-    images: [],
+    images: ["/images/sf_single_family_coming_soon.jpeg"],
     description: "Coming soon — details to be announced.",
     propertyType: "Single Family",
   },
