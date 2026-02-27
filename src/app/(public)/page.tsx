@@ -92,6 +92,7 @@ export default function Home() {
   // Filter listings that have images for the carousel
   const listingsWithImages = allListings.filter((listing) => listing.images.length > 0);
   const carouselListings = listingsWithImages.slice(0, 8); // Show up to 8 listings in carousel
+  const activeListings = allListings.filter((l) => l.status === "active");
   const recentListings = allListings.filter((l) => l.status === "sold" || l.status === "pending").slice(0, 9);
 
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -214,56 +215,94 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Upcoming Listings Section */}
-      <section className="py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <ScrollReveal>
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-16">
-              <div>
-                <p className="text-[#d4a012] text-xs uppercase tracking-[0.3em] mb-4">Coming Soon</p>
-                <h2 className="font-serif text-4xl md:text-5xl text-neutral-900">Upcoming Listings</h2>
-                <div className="w-20 h-0.5 bg-[#d4a012] mt-6" />
+      {/* Active Listings Section */}
+      {activeListings.length > 0 && (
+        <section className="py-24 bg-white">
+          <div className="max-w-7xl mx-auto px-6 lg:px-8">
+            <ScrollReveal>
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-16">
+                <div>
+                  <p className="text-[#d4a012] text-xs uppercase tracking-[0.3em] mb-4">Available Now</p>
+                  <h2 className="font-serif text-4xl md:text-5xl text-neutral-900">Listings</h2>
+                  <div className="w-20 h-0.5 bg-[#d4a012] mt-6" />
+                </div>
+                <Link
+                  href="/listings"
+                  className="group inline-flex items-center gap-3 text-neutral-900 text-sm uppercase tracking-[0.15em] font-medium hover:text-[#d4a012] transition-colors"
+                >
+                  View All
+                  <svg className="w-5 h-5 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  </svg>
+                </Link>
               </div>
+            </ScrollReveal>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {activeListings.map((listing, index) => (
+                <ScrollReveal key={listing.id} delay={index * 100}>
+                  <Link
+                    href={`/listings/${listing.id}`}
+                    className="group block"
+                  >
+                    <div className="aspect-[4/3] bg-neutral-100 relative overflow-hidden mb-6">
+                      {listing.images[0] ? (
+                        <Image
+                          src={listing.images[0]}
+                          alt={listing.address}
+                          fill
+                          className="object-cover transition-transform duration-700 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-neutral-300">
+                          <svg className="w-16 h-16 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z" />
+                          </svg>
+                          <span className="text-xs uppercase tracking-[0.2em]">Coming Soon</span>
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-300 flex items-center justify-center">
+                        <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 transform scale-75 group-hover:scale-100">
+                          <svg className="w-6 h-6 text-neutral-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                          </svg>
+                        </div>
+                      </div>
+
+                      <div className="absolute top-4 left-4">
+                        <span className="px-4 py-2 bg-[#d4a012] text-white text-xs uppercase tracking-[0.15em]">
+                          {listing.price > 0 ? "For Sale" : "Coming Soon"}
+                        </span>
+                      </div>
+
+                      {listing.price > 0 && (
+                        <div className="absolute bottom-4 right-4">
+                          <span className="px-4 py-2 bg-white text-neutral-900 text-sm font-medium">
+                            {formatPrice(listing.price)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <h3 className="font-serif text-xl text-neutral-900 group-hover:text-[#d4a012] transition-colors mb-1">
+                        {listing.address}
+                      </h3>
+                      <p className="text-neutral-500 text-sm mb-3">{listing.city}</p>
+
+                      <div className="flex items-center gap-6 text-sm text-neutral-600">
+                        <span>{listing.bedrooms} Beds</span>
+                        <span>{listing.bathrooms} Baths</span>
+                        {listing.sqft > 0 && <span>{listing.sqft.toLocaleString()} Sqft</span>}
+                      </div>
+                    </div>
+                  </Link>
+                </ScrollReveal>
+              ))}
             </div>
-          </ScrollReveal>
-
-          {/* Upcoming Listings Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <ScrollReveal delay={0}>
-              <div className="bg-neutral-50 p-8 border border-neutral-200 hover:border-[#d4a012] transition-colors">
-                <div className="mb-4">
-                  <span className="px-3 py-1 bg-[#d4a012]/10 text-[#d4a012] text-xs uppercase tracking-[0.15em]">
-                    Coming Soon
-                  </span>
-                </div>
-                <h3 className="font-serif text-xl text-neutral-900 mb-2">Townhouse in Belmont</h3>
-                <p className="text-neutral-500 text-sm mb-4">Belmont, CA</p>
-                <div className="flex items-center gap-6 text-sm text-neutral-600">
-                  <span>3 Beds</span>
-                  <span>2.5 Baths</span>
-                </div>
-              </div>
-            </ScrollReveal>
-
-            <ScrollReveal delay={100}>
-              <div className="bg-neutral-50 p-8 border border-neutral-200 hover:border-[#d4a012] transition-colors">
-                <div className="mb-4">
-                  <span className="px-3 py-1 bg-[#d4a012]/10 text-[#d4a012] text-xs uppercase tracking-[0.15em]">
-                    Coming Soon
-                  </span>
-                </div>
-                <h3 className="font-serif text-xl text-neutral-900 mb-2">Single Family in San Francisco</h3>
-                <p className="text-neutral-500 text-sm mb-4">San Francisco, CA</p>
-                <div className="flex items-center gap-6 text-sm text-neutral-600">
-                  <span>3 Beds</span>
-                  <span>1 Bath</span>
-                </div>
-              </div>
-            </ScrollReveal>
           </div>
-
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Recently Sold Homes */}
       <section className="py-24 bg-neutral-50">

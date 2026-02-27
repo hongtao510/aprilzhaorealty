@@ -56,13 +56,20 @@ export default function ListingsPage() {
                     className="group block"
                   >
                     <div className="aspect-[4/3] bg-neutral-100 relative overflow-hidden mb-6">
-                      {listing.images[0] && (
+                      {listing.images[0] ? (
                         <Image
                           src={listing.images[0]}
                           alt={listing.address}
                           fill
                           className="object-cover transition-transform duration-700 group-hover:scale-105"
                         />
+                      ) : (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-neutral-300">
+                          <svg className="w-16 h-16 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z" />
+                          </svg>
+                          <span className="text-xs uppercase tracking-[0.2em]">Coming Soon</span>
+                        </div>
                       )}
                       {/* Hover overlay with arrow */}
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-300 flex items-center justify-center">
@@ -76,15 +83,17 @@ export default function ListingsPage() {
                       {/* Status Badge */}
                       <div className="absolute top-4 left-4">
                         <span className="px-4 py-2 bg-[#d4a012] text-white text-xs uppercase tracking-[0.15em]">
-                          For Sale
+                          {listing.price > 0 ? "For Sale" : "Coming Soon"}
                         </span>
                       </div>
                     </div>
 
                     <div>
-                      <p className="text-[#d4a012] text-xs uppercase tracking-[0.2em] mb-2">
-                        {formatPrice(listing.price)}
-                      </p>
+                      {listing.price > 0 && (
+                        <p className="text-[#d4a012] text-xs uppercase tracking-[0.2em] mb-2">
+                          {formatPrice(listing.price)}
+                        </p>
+                      )}
                       <h3 className="font-serif text-xl text-neutral-900 group-hover:text-[#d4a012] transition-colors mb-1">
                         {listing.address}
                       </h3>
@@ -93,7 +102,7 @@ export default function ListingsPage() {
                       <div className="flex items-center gap-6 text-sm text-neutral-600">
                         <span>{listing.bedrooms} Beds</span>
                         <span>{listing.bathrooms} Baths</span>
-                        <span>{listing.sqft.toLocaleString()} Sqft</span>
+                        {listing.sqft > 0 && <span>{listing.sqft.toLocaleString()} Sqft</span>}
                       </div>
                     </div>
                   </Link>
@@ -102,55 +111,6 @@ export default function ListingsPage() {
             </div>
           </section>
         )}
-
-        {/* Upcoming Listings Section */}
-        <section className="mb-24">
-          <ScrollReveal>
-            <div className="flex items-center gap-4 mb-12">
-              <div>
-                <p className="text-[#d4a012] text-xs uppercase tracking-[0.3em] mb-2">Coming Soon</p>
-                <h2 className="font-serif text-3xl text-neutral-900">
-                  Upcoming Listings
-                </h2>
-              </div>
-            </div>
-          </ScrollReveal>
-
-          {/* Coming Soon Listings */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <ScrollReveal delay={0}>
-              <div className="bg-neutral-50 p-8 border border-neutral-200 hover:border-[#d4a012] transition-colors">
-                <div className="mb-4">
-                  <span className="px-3 py-1 bg-[#d4a012]/10 text-[#d4a012] text-xs uppercase tracking-[0.15em]">
-                    Coming Soon
-                  </span>
-                </div>
-                <h3 className="font-serif text-xl text-neutral-900 mb-2">Townhouse in Belmont</h3>
-                <p className="text-neutral-500 text-sm mb-4">Belmont, CA</p>
-                <div className="flex items-center gap-6 text-sm text-neutral-600">
-                  <span>3 Beds</span>
-                  <span>2.5 Baths</span>
-                </div>
-              </div>
-            </ScrollReveal>
-
-            <ScrollReveal delay={100}>
-              <div className="bg-neutral-50 p-8 border border-neutral-200 hover:border-[#d4a012] transition-colors">
-                <div className="mb-4">
-                  <span className="px-3 py-1 bg-[#d4a012]/10 text-[#d4a012] text-xs uppercase tracking-[0.15em]">
-                    Coming Soon
-                  </span>
-                </div>
-                <h3 className="font-serif text-xl text-neutral-900 mb-2">Single Family in San Francisco</h3>
-                <p className="text-neutral-500 text-sm mb-4">San Francisco, CA</p>
-                <div className="flex items-center gap-6 text-sm text-neutral-600">
-                  <span>3 Beds</span>
-                  <span>1 Bath</span>
-                </div>
-              </div>
-            </ScrollReveal>
-          </div>
-        </section>
 
         {/* Sold Listings Section */}
         <section>
