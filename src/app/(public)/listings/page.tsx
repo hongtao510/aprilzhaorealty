@@ -83,7 +83,7 @@ export default function ListingsPage() {
                       {/* Status Badge */}
                       <div className="absolute top-4 left-4">
                         <span className="px-4 py-2 bg-[#d4a012] text-white text-xs uppercase tracking-[0.15em]">
-                          {listing.price > 0 ? "For Sale" : "Coming Soon"}
+                          {listing.price > 0 || listing.mlsLink ? "For Sale" : "Coming Soon"}
                         </span>
                       </div>
                     </div>
