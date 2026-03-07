@@ -180,7 +180,7 @@ export default function Home() {
           <div className="max-w-7xl mx-auto px-6 lg:px-8 py-6 flex justify-between items-end">
             {/* Current property info */}
             <div>
-              <p className="text-[#d4a012] text-xs uppercase tracking-[0.2em] mb-2">Recently Sold</p>
+              <p className="text-[#d4a012] text-xs uppercase tracking-[0.2em] mb-2">{carouselListings[currentSlide]?.status === "active" ? "For Sale" : carouselListings[currentSlide]?.status === "pending" ? "Pending" : "Recently Sold"}</p>
               <p className="text-white text-base md:text-lg font-medium">{carouselListings[currentSlide]?.address}</p>
               <p className="text-white/70 text-sm">{carouselListings[currentSlide]?.city}</p>
             </div>
