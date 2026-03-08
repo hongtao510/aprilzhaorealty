@@ -39,24 +39,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    async function init() {
-      const { data } = await supabase.auth.getUser();
-      setUser(data.user);
-      if (data.user) {
-        fetchProfile(data.user.id);
+    let settled = false;
+    function settle() {
+      if (!settled) {
+        settled = true;
+        setLoading(false);
       }
-      setLoading(false);
+    }
+
+    // Timeout: never hang more than 5 seconds
+    const timeout = setTimeout(() => {
+      console.warn("Auth init timed out after 5s");
+      settle();
+    }, 5000);
+
+    async function init() {
+      try {
+        const { data } = await supabase.auth.getUser();
+        setUser(data.user);
+        if (data.user) {
+          await fetchProfile(data.user.id);
+        }
+      } catch (err) {
+        console.error("Auth init failed:", err);
+      } finally {
+        clearTimeout(timeout);
+        settle();
+      }
     }
     init();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
-      (_event: AuthChangeEvent, session: Session | null) => {
+      async (_event: AuthChangeEvent, session: Session | null) => {
         const currentUser = session?.user ?? null;
         setUser(currentUser);
         if (currentUser) {
-          fetchProfile(currentUser.id);
+          await fetchProfile(currentUser.id);
         } else {
           setProfile(null);
         }

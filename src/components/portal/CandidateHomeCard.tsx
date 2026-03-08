@@ -133,7 +133,7 @@ export default function CandidateHomeCard({
           </a>
 
           <a
-            href={`/admin/comps/${home.id}`}
+            href={`/comps/${home.id}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-900 text-white text-xs uppercase tracking-wider hover:bg-neutral-700 transition-colors rounded"

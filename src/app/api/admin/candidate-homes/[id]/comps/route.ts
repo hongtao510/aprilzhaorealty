@@ -172,6 +172,25 @@ export async function POST(
     }
   }
 
+  // Check for API key early
+  if (!process.env.ANTHROPIC_API_KEY) {
+    const msg = "ANTHROPIC_API_KEY is not set in .env.local";
+    if (stream) {
+      const encoder = new TextEncoder();
+      const body = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify({ message: msg })}\n\n`));
+          controller.enqueue(encoder.encode(`event: done\ndata: {}\n\n`));
+          controller.close();
+        },
+      });
+      return new Response(body, {
+        headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" },
+      });
+    }
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+
   // Build user prompt
   const address = home.address || home.title || "Unknown address";
   const price = home.price || home.price_numeric || "Unknown";
@@ -284,8 +303,10 @@ Find the top 8 comparable recently-sold homes in the same area and produce the C
           if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
             rawResponse += event.delta.text;
             tokenCount += 1;
+            // Stream raw tokens to client
+            send("token", { text: event.delta.text });
             // Send token count updates periodically
-            if (tokenCount % 50 === 0) {
+            if (tokenCount % 100 === 0) {
               send("log", { message: `Generating... (${tokenCount} tokens)` });
             }
           }
