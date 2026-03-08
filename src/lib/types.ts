@@ -108,6 +108,14 @@ export interface CandidateHome {
   beds: number | null;
   baths: number | null;
   sqft: number | null;
+  lot_sqft: number | null;
+  year_built: number | null;
+  property_type: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  valuation: number | null;
+  valuation_low: number | null;
+  valuation_high: number | null;
   status: "new" | "saved" | "sent" | "dismissed";
   source: "redfin" | "manual";
   search_criteria_id: string | null;

@@ -115,7 +115,32 @@ export default function CandidateHomeCard({
         )}
 
         {home.address && (
-          <p className="text-sm text-neutral-600 mb-2">{home.address}</p>
+          <p className="text-sm text-neutral-600 mb-1">{home.address}</p>
+        )}
+
+        {/* RentCast valuation */}
+        {home.valuation && (
+          <p className="text-xs text-emerald-600 font-medium mb-1">
+            Est. ${home.valuation.toLocaleString()}
+            {home.valuation_low && home.valuation_high && (
+              <span className="text-neutral-400 font-normal">
+                {" "}({`$${home.valuation_low.toLocaleString()} – $${home.valuation_high.toLocaleString()}`})
+              </span>
+            )}
+          </p>
+        )}
+
+        {/* Extra details */}
+        {(home.lot_sqft || home.year_built || home.property_type) && (
+          <p className="text-xs text-neutral-400 mb-1">
+            {[
+              home.lot_sqft ? `${home.lot_sqft.toLocaleString()} sqft lot` : null,
+              home.year_built ? `Built ${home.year_built}` : null,
+              home.property_type || null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
         )}
 
         {home.notes && (
