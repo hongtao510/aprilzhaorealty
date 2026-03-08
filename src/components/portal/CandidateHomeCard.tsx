@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import type { CandidateHome } from "@/lib/types";
+import CompsModal from "./CompsModal";
 
 type CardStatus = "new" | "saved" | "dismissed";
 
@@ -32,6 +34,7 @@ export default function CandidateHomeCard({
   selected = false,
   onToggleSelect,
 }: CandidateHomeCardProps) {
+  const [compsOpen, setCompsOpen] = useState(false);
   const badge = statusColors[home.status] || statusColors.new;
 
   return (
@@ -132,6 +135,13 @@ export default function CandidateHomeCard({
             View Listing
           </a>
 
+          <button
+            onClick={() => setCompsOpen(true)}
+            className="text-xs uppercase tracking-wider text-neutral-500 hover:text-[#d4a012] transition-colors"
+          >
+            Find Comps
+          </button>
+
           {onStatusChange && (
             <select
               value={home.status === "sent" ? "saved" : home.status}
@@ -150,6 +160,13 @@ export default function CandidateHomeCard({
         <p className="text-xs text-neutral-300 mt-2">
           Added {new Date(home.created_at).toLocaleDateString()}
         </p>
+
+        <CompsModal
+          isOpen={compsOpen}
+          onClose={() => setCompsOpen(false)}
+          homeAddress={home.address || home.title || "Unknown"}
+          homeId={home.id}
+        />
       </div>
     </div>
   );

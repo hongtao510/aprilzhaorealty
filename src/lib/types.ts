@@ -130,3 +130,65 @@ export interface SearchCriteria {
   min_baths: number | null;
   is_active: boolean;
 }
+
+export interface CompHome {
+  address: string;
+  sold_price: number;
+  sold_date: string;
+  sqft: number;
+  beds: number;
+  baths: number;
+  lot_sqft: number;
+  similarity_score: number;
+  price_per_sqft: number;
+  reason: string;
+}
+
+export interface CompsEstimate {
+  weighted_price_per_sqft: number;
+  comp_based: number;
+  trend_adjusted: number;
+  market_temperature: "hot" | "warm" | "cool";
+  trend_adjustment_pct: number;
+  range: {
+    most_likely: [number, number];
+    likely: [number, number];
+    possible: [number, number];
+    unlikely_below: number;
+    unlikely_above: number;
+  };
+}
+
+export interface CompsMarketSignals {
+  sale_to_list_ratio: string;
+  days_on_market: number;
+  yoy_change: string;
+  mom_change: string;
+}
+
+export interface CompsResult {
+  comps: CompHome[];
+  subject: {
+    address: string;
+    sqft: number;
+    beds: number;
+    baths: number;
+    lot_sqft: number;
+  };
+  estimate: CompsEstimate;
+  market_signals: CompsMarketSignals;
+  reasoning: string;
+}
+
+export interface CandidateComp {
+  id: string;
+  candidate_home_id: string;
+  comps: CompsResult;
+  price_estimate: number | null;
+  price_range_low: number | null;
+  price_range_high: number | null;
+  market_temperature: "hot" | "warm" | "cool" | null;
+  reasoning: string | null;
+  raw_response: string | null;
+  created_at: string;
+}
