@@ -29,7 +29,7 @@ function timestamp(): string {
 
 export default function CompsPage() {
   const { id } = useParams<{ id: string }>();
-  const [model, setModel] = useState("claude-sonnet-4-6");
+  const [model, setModel] = useState("claude-opus-4-6");
   const [logs, setLogs] = useState<{ time: string; message: string }[]>([]);
   const [rawOutput, setRawOutput] = useState("");
   const [result, setResult] = useState<CompsResult | null>(null);
