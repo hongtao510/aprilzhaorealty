@@ -1,8 +1,6 @@
 "use client";
 
-import { useState } from "react";
 import type { CandidateHome } from "@/lib/types";
-import CompsModal from "./CompsModal";
 
 type CardStatus = "new" | "saved" | "dismissed";
 
@@ -34,7 +32,6 @@ export default function CandidateHomeCard({
   selected = false,
   onToggleSelect,
 }: CandidateHomeCardProps) {
-  const [compsOpen, setCompsOpen] = useState(false);
   const badge = statusColors[home.status] || statusColors.new;
 
   return (
@@ -135,12 +132,17 @@ export default function CandidateHomeCard({
             View Listing
           </a>
 
-          <button
-            onClick={() => setCompsOpen(true)}
-            className="text-xs uppercase tracking-wider text-neutral-500 hover:text-[#d4a012] transition-colors"
+          <a
+            href={`/admin/comps/${home.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-900 text-white text-xs uppercase tracking-wider hover:bg-neutral-700 transition-colors rounded"
           >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
             Find Comps
-          </button>
+          </a>
 
           {onStatusChange && (
             <select
@@ -160,13 +162,6 @@ export default function CandidateHomeCard({
         <p className="text-xs text-neutral-300 mt-2">
           Added {new Date(home.created_at).toLocaleDateString()}
         </p>
-
-        <CompsModal
-          isOpen={compsOpen}
-          onClose={() => setCompsOpen(false)}
-          homeAddress={home.address || home.title || "Unknown"}
-          homeId={home.id}
-        />
       </div>
     </div>
   );

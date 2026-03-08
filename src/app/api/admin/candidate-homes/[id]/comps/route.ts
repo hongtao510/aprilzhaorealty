@@ -105,6 +105,7 @@ export async function POST(
   const { id } = await params;
   const { searchParams } = new URL(request.url);
   const force = searchParams.get("force") === "true";
+  const stream = searchParams.get("stream") === "true";
   const modelParam = searchParams.get("model") || "claude-opus-4-6";
 
   if (!VALID_MODELS.includes(modelParam as ValidModel)) {
@@ -144,6 +145,29 @@ export async function POST(
       .maybeSingle();
 
     if (cached) {
+      if (stream) {
+        // Return SSE with cached result
+        const encoder = new TextEncoder();
+        const body = new ReadableStream({
+          start(controller) {
+            const send = (event: string, data: unknown) => {
+              controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+            };
+            send("log", { message: "Found cached CMA report (less than 7 days old)" });
+            send("log", { message: "Returning cached results" });
+            send("result", cached.comps);
+            send("done", {});
+            controller.close();
+          },
+        });
+        return new Response(body, {
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+          },
+        });
+      }
       return NextResponse.json(cached.comps as CompsResult);
     }
   }
@@ -165,57 +189,37 @@ Bathrooms: ${baths}
 
 Find the top 8 comparable recently-sold homes in the same area and produce the CompsResult JSON.`;
 
-  // Call Claude API
-  const anthropic = new Anthropic();
-
-  let rawResponse: string;
-  try {
-    const message = await anthropic.messages.create({
-      model,
-      max_tokens: 8192,
-      temperature: 0,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: userPrompt }],
-    });
-
-    const textBlock = message.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
-      return NextResponse.json(
-        { error: "No text response from Claude" },
-        { status: 502 }
-      );
+  // Non-streaming mode
+  if (!stream) {
+    const anthropic = new Anthropic();
+    let rawResponse: string;
+    try {
+      const message = await anthropic.messages.create({
+        model,
+        max_tokens: 8192,
+        temperature: 0,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: "user", content: userPrompt }],
+      });
+      const textBlock = message.content.find((b) => b.type === "text");
+      if (!textBlock || textBlock.type !== "text") {
+        return NextResponse.json({ error: "No text response from Claude" }, { status: 502 });
+      }
+      rawResponse = textBlock.text;
+    } catch (err) {
+      return NextResponse.json({ error: err instanceof Error ? err.message : "Claude API call failed" }, { status: 502 });
     }
-    rawResponse = textBlock.text;
-  } catch (err) {
-    const errorMessage =
-      err instanceof Error ? err.message : "Claude API call failed";
-    return NextResponse.json({ error: errorMessage }, { status: 502 });
-  }
 
-  // Parse response — strip markdown code fences if present
-  let compsResult: CompsResult;
-  try {
-    const cleaned = rawResponse
-      .replace(/^```(?:json)?\s*\n?/i, "")
-      .replace(/\n?```\s*$/i, "")
-      .trim();
-    compsResult = JSON.parse(cleaned) as CompsResult;
-  } catch {
-    return NextResponse.json(
-      { error: "Failed to parse Claude response as JSON", raw: rawResponse },
-      { status: 502 }
-    );
-  }
+    let compsResult: CompsResult;
+    try {
+      const cleaned = rawResponse.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+      compsResult = JSON.parse(cleaned) as CompsResult;
+    } catch {
+      return NextResponse.json({ error: "Failed to parse Claude response as JSON", raw: rawResponse }, { status: 502 });
+    }
 
-  // Delete old cache rows for this home, then insert new one
-  await supabase
-    .from("candidate_comps")
-    .delete()
-    .eq("candidate_home_id", id);
-
-  const { error: insertError } = await supabase
-    .from("candidate_comps")
-    .insert({
+    await supabase.from("candidate_comps").delete().eq("candidate_home_id", id);
+    await supabase.from("candidate_comps").insert({
       candidate_home_id: id,
       comps: compsResult as unknown as Record<string, unknown>,
       price_estimate: compsResult.estimate?.trend_adjusted ?? null,
@@ -226,10 +230,137 @@ Find the top 8 comparable recently-sold homes in the same area and produce the C
       raw_response: rawResponse,
     });
 
-  if (insertError) {
-    // Still return the result even if caching fails
-    console.error("Failed to cache comps result:", insertError.message);
+    return NextResponse.json(compsResult);
   }
 
-  return NextResponse.json(compsResult);
+  // Streaming mode (SSE)
+  const encoder = new TextEncoder();
+  const abortController = new AbortController();
+
+  // Listen for client disconnect
+  request.signal.addEventListener("abort", () => {
+    abortController.abort();
+  });
+
+  const body = new ReadableStream({
+    async start(controller) {
+      const send = (event: string, data: unknown) => {
+        try {
+          controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+        } catch {
+          // Stream already closed
+        }
+      };
+
+      try {
+        send("log", { message: `Subject: ${address}` });
+        send("log", { message: `Details: ${beds} bed / ${baths} bath / ${sqft} sqft` });
+        send("log", { message: `Listed at: ${typeof price === "number" ? `$${price.toLocaleString()}` : price}` });
+        send("log", { message: "" });
+        send("log", { message: `Connecting to Claude API (${model})...` });
+
+        const anthropic = new Anthropic();
+        let rawResponse = "";
+
+        send("log", { message: "Streaming response from Claude..." });
+
+        const stream = anthropic.messages.stream({
+          model,
+          max_tokens: 8192,
+          temperature: 0,
+          system: SYSTEM_PROMPT,
+          messages: [{ role: "user", content: userPrompt }],
+        }, { signal: abortController.signal });
+
+        let tokenCount = 0;
+        for await (const event of stream) {
+          if (abortController.signal.aborted) {
+            send("log", { message: "Analysis stopped by user" });
+            send("done", {});
+            controller.close();
+            return;
+          }
+
+          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+            rawResponse += event.delta.text;
+            tokenCount += 1;
+            // Send token count updates periodically
+            if (tokenCount % 50 === 0) {
+              send("log", { message: `Generating... (${tokenCount} tokens)` });
+            }
+          }
+        }
+
+        send("log", { message: `Response complete (${tokenCount} tokens)` });
+        send("log", { message: "Parsing JSON response..." });
+
+        // Parse response
+        let compsResult: CompsResult;
+        try {
+          const cleaned = rawResponse.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+          compsResult = JSON.parse(cleaned) as CompsResult;
+        } catch {
+          send("log", { message: "ERROR: Failed to parse Claude response as JSON" });
+          send("error", { message: "Failed to parse response", raw: rawResponse.slice(0, 500) });
+          send("done", {});
+          controller.close();
+          return;
+        }
+
+        const compsCount = compsResult.comps?.length ?? 0;
+        send("log", { message: `Found ${compsCount} comparable sales` });
+
+        if (compsResult.estimate) {
+          send("log", { message: `Comp-based estimate: $${compsResult.estimate.comp_based?.toLocaleString()}` });
+          send("log", { message: `Market temperature: ${compsResult.estimate.market_temperature}` });
+          send("log", { message: `Trend-adjusted estimate: $${compsResult.estimate.trend_adjusted?.toLocaleString()}` });
+        }
+
+        send("log", { message: "" });
+        send("log", { message: "Saving to cache..." });
+
+        // Cache result
+        await supabase.from("candidate_comps").delete().eq("candidate_home_id", id);
+        const { error: insertError } = await supabase.from("candidate_comps").insert({
+          candidate_home_id: id,
+          comps: compsResult as unknown as Record<string, unknown>,
+          price_estimate: compsResult.estimate?.trend_adjusted ?? null,
+          price_range_low: compsResult.estimate?.range?.most_likely?.[0] ?? null,
+          price_range_high: compsResult.estimate?.range?.most_likely?.[1] ?? null,
+          market_temperature: compsResult.estimate?.market_temperature ?? null,
+          reasoning: compsResult.reasoning ?? null,
+          raw_response: rawResponse,
+        });
+
+        if (insertError) {
+          send("log", { message: `Warning: cache save failed (${insertError.message})` });
+        } else {
+          send("log", { message: "Cached successfully (expires in 7 days)" });
+        }
+
+        send("log", { message: "Done!" });
+        send("result", compsResult);
+        send("done", {});
+      } catch (err) {
+        if (abortController.signal.aborted) {
+          send("log", { message: "Analysis stopped by user" });
+        } else {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          send("log", { message: `ERROR: ${msg}` });
+          send("error", { message: msg });
+        }
+        send("done", {});
+      }
+
+      controller.close();
+    },
+  });
+
+  return new Response(body, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
 }
