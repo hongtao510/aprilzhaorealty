@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
   const { supabase, error, status } = await verifyAdmin();
   if (error) return NextResponse.json({ error }, { status: status! });
 
-  const { url } = await request.json();
+  const { url, beds: manualBeds, baths: manualBaths, sqft: manualSqft } = await request.json();
 
   if (!url) {
     return NextResponse.json({ error: "url is required" }, { status: 400 });
@@ -75,15 +75,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "This listing is already in candidates" }, { status: 409 });
   }
 
-  // Scrape OG preview
-  let preview = { title: null as string | null, image_url: null as string | null, address: null as string | null, price: null as string | null };
+  // Scrape OG preview + property details
+  const preview = {
+    title: null as string | null,
+    image_url: null as string | null,
+    address: null as string | null,
+    price: null as string | null,
+    beds: null as number | null,
+    baths: null as number | null,
+    sqft: null as number | null,
+  };
   try {
     const response = await fetch(url, {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
       },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(8000),
     });
 
     if (response.ok) {
@@ -117,6 +125,35 @@ export async function POST(request: NextRequest) {
 
       preview.title = ogTitle;
       preview.image_url = ogImage;
+
+      // Extract beds, baths, sqft from OG description or page content
+      // Common patterns: "3 bed, 2 bath, 1500 sqft" or "3 Beds · 2 Baths · 1,500 Sq. Ft."
+      const detailSource = `${ogTitle || ""} ${ogDescription || ""}`;
+
+      const bedsMatch = detailSource.match(/(\d+)\s*(?:beds?|bd|bedrooms?|br)\b/i);
+      if (bedsMatch) preview.beds = parseInt(bedsMatch[1], 10);
+
+      const bathsMatch = detailSource.match(/([\d.]+)\s*(?:baths?|ba|bathrooms?)\b/i);
+      if (bathsMatch) preview.baths = parseFloat(bathsMatch[1]);
+
+      const sqftMatch = detailSource.match(/([\d,]+)\s*(?:sq\.?\s*ft\.?|sqft|square\s*feet)/i);
+      if (sqftMatch) preview.sqft = parseInt(sqftMatch[1].replace(/,/g, ""), 10);
+
+      // Also try JSON-LD structured data (Redfin, Zillow, etc.)
+      const jsonLdMatches = html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+      for (const m of jsonLdMatches) {
+        try {
+          const ld = JSON.parse(m[1]);
+          const item = Array.isArray(ld) ? ld[0] : ld;
+          if (item?.["@type"]?.match?.(/Residence|House|Product|RealEstateListing/i) || item?.["@type"]?.includes?.("Residence")) {
+            if (!preview.beds && item.numberOfBedrooms) preview.beds = parseInt(item.numberOfBedrooms, 10);
+            if (!preview.baths && item.numberOfBathroomsTotal) preview.baths = parseFloat(item.numberOfBathroomsTotal);
+            if (!preview.sqft && item.floorSize?.value) preview.sqft = parseInt(String(item.floorSize.value).replace(/,/g, ""), 10);
+          }
+        } catch {
+          // JSON-LD parsing is best-effort
+        }
+      }
     }
   } catch {
     // Preview scraping is best-effort
@@ -136,6 +173,9 @@ export async function POST(request: NextRequest) {
       address: preview.address,
       price: preview.price,
       price_numeric: priceNumeric,
+      beds: manualBeds ?? preview.beds,
+      baths: manualBaths ?? preview.baths,
+      sqft: manualSqft ?? preview.sqft,
       status: "new",
       source: "manual",
     })

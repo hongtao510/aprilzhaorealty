@@ -10,6 +10,9 @@ export default function AdminSearchPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [beds, setBeds] = useState("");
+  const [baths, setBaths] = useState("");
+  const [sqft, setSqft] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -70,7 +73,12 @@ export default function AdminSearchPage() {
       const res = await fetch("/api/admin/candidate-homes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({
+          url,
+          beds: beds ? parseInt(beds, 10) : undefined,
+          baths: baths ? parseFloat(baths) : undefined,
+          sqft: sqft ? parseInt(sqft, 10) : undefined,
+        }),
       });
 
       if (!res.ok) {
@@ -82,6 +90,9 @@ export default function AdminSearchPage() {
       setSaved(true);
       setUrl("");
       setPreview(null);
+      setBeds("");
+      setBaths("");
+      setSqft("");
     } catch {
       setError("Failed to add listing");
     } finally {
@@ -192,6 +203,46 @@ export default function AdminSearchPage() {
               </div>
             </div>
           )}
+
+          {/* Property Details (optional) */}
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-2">
+              Property Details <span className="text-neutral-300">(optional — helps CMA accuracy)</span>
+            </label>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <input
+                  type="number"
+                  value={beds}
+                  onChange={(e) => setBeds(e.target.value)}
+                  placeholder="Beds"
+                  min="0"
+                  className="w-full border border-neutral-200 px-4 py-3 text-sm text-neutral-900 placeholder-neutral-300 focus:outline-none focus:border-[#d4a012] transition-colors"
+                />
+              </div>
+              <div>
+                <input
+                  type="number"
+                  value={baths}
+                  onChange={(e) => setBaths(e.target.value)}
+                  placeholder="Baths"
+                  min="0"
+                  step="0.5"
+                  className="w-full border border-neutral-200 px-4 py-3 text-sm text-neutral-900 placeholder-neutral-300 focus:outline-none focus:border-[#d4a012] transition-colors"
+                />
+              </div>
+              <div>
+                <input
+                  type="number"
+                  value={sqft}
+                  onChange={(e) => setSqft(e.target.value)}
+                  placeholder="Sqft"
+                  min="0"
+                  className="w-full border border-neutral-200 px-4 py-3 text-sm text-neutral-900 placeholder-neutral-300 focus:outline-none focus:border-[#d4a012] transition-colors"
+                />
+              </div>
+            </div>
+          </div>
 
           {error && <p className="text-red-500 text-sm">{error}</p>}
 
