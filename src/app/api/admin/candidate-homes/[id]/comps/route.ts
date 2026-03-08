@@ -35,20 +35,76 @@ async function verifyAdmin() {
 
 const SYSTEM_PROMPT = `You are a real estate Comparative Market Analysis (CMA) expert. Given a subject property, produce a JSON object matching the CompsResult schema exactly. Return ONLY valid JSON — no markdown, no explanation, no code fences.
 
-CompsResult schema:
+=== COMP SEARCH CRITERIA (in priority order) ===
+1. Same neighborhood, ideally within 0.5 miles of the subject property
+2. Same zip code preferred, but nearby zip codes acceptable
+3. Same property type (Single Family, Condo, Townhouse, etc.)
+4. SOLD within the last 6 months (extend to 12 months if insufficient comps)
+5. CRITICAL: Use actual SOLD prices only — never listing/ask prices
+6. Collect at least 15-20 candidates, then filter to top 8 by similarity score
+
+=== SIMILARITY SCORING (scores are 0.0-1.0 decimals) ===
+Criterion 1 — House Size (50% weight):
+  size_diff = abs(comp_sqft - subject_sqft) / subject_sqft
+  score = max(0, 1 - size_diff / 0.20)
+  Similar if within 20% of subject sqft
+
+Criterion 2 — Bed+Bath Count (30% weight):
+  diff = abs((comp_beds + comp_baths) - (subject_beds + subject_baths))
+  score = max(0, 1 - diff / 3)
+  Similar if total bed+bath count differs by 3 or less
+
+Criterion 3 — Lot Size (20% weight):
+  lot_diff = abs(comp_lot - subject_lot) / subject_lot
+  score = max(0, 1 - lot_diff / 0.30)
+  Similar if within 30% of subject lot size
+
+Combined: total_score = 0.50 * size_score + 0.30 * bedbath_score + 0.20 * lot_score
+Filter out any comp where ALL three scores = 0.
+Tie-breaking: closer proximity wins, then more recent sale date wins.
+
+=== PRICE ESTIMATION ===
+1. IGNORE the subject property's listing price — it can be misleading
+2. For each comp: price_per_sqft = comp_sold_price / comp_sqft
+3. Weighted average: estimated_price_per_sqft = sum(comp_price_per_sqft * comp_score) / sum(comp_scores)
+4. comp_based estimate = estimated_price_per_sqft * subject_sqft
+5. Round estimate to nearest $1,000
+
+=== MARKET TREND ADJUSTMENT ===
+Classify market temperature using recent month-over-month data:
+- "hot": median price up >2% MoM, homes selling above list, <14 days on market → adjust UP 2-5%
+- "warm": median price up 0-2% MoM, selling near list, 14-30 days on market → NO adjustment
+- "cool": median price flat/declining MoM, selling below list, >30 days on market → adjust DOWN 2-5%
+
+trend_adjusted = comp_based * (1 + trend_adjustment_pct / 100)
+
+=== RANGE BUILDING ===
+1. Collect all comp-implied prices: comp_price_per_sqft * subject_sqft (trend-adjusted)
+2. Compute weighted mean and weighted standard deviation
+3. Cap "most_likely" half-width: half_width = min(0.5 * std, 100000) — max $200k total width
+4. Build sub-ranges with $100,000 bands outward:
+   - most_likely (50%): [mean - half_width, mean + half_width]
+   - likely (25%): [mean - half_width - 100k, mean + half_width + 100k]
+   - possible (15%): [mean - half_width - 200k, mean + half_width + 200k]
+   - unlikely_below: below possible low
+   - unlikely_above: above possible high
+5. Round all range boundaries to nearest $25,000
+
+=== OUTPUT SCHEMA ===
+CompsResult:
 {
   "comps": [CompHome, ...],          // exactly 8 comparable recently-sold homes
   "subject": { "address": string, "sqft": number, "beds": number, "baths": number, "lot_sqft": number },
   "estimate": {
     "weighted_price_per_sqft": number,
-    "comp_based": number,            // weighted average comp-based estimate
-    "trend_adjusted": number,        // comp_based adjusted for market trend
+    "comp_based": number,
+    "trend_adjusted": number,
     "market_temperature": "hot" | "warm" | "cool",
     "trend_adjustment_pct": number,  // e.g. 2.5 means +2.5%
     "range": {
-      "most_likely": [low, high],    // ~68% confidence
-      "likely": [low, high],         // ~90% confidence
-      "possible": [low, high],       // ~95% confidence
+      "most_likely": [low, high],
+      "likely": [low, high],
+      "possible": [low, high],
       "unlikely_below": number,
       "unlikely_above": number
     }
@@ -62,7 +118,7 @@ CompsResult schema:
   "reasoning": string               // 2-4 sentence CMA narrative
 }
 
-CompHome schema:
+CompHome:
 {
   "address": string,
   "sold_price": number,
@@ -71,29 +127,10 @@ CompHome schema:
   "beds": number,
   "baths": number,
   "lot_sqft": number,
-  "similarity_score": number,       // 0.0-1.0 decimal, see rules below
+  "similarity_score": number,       // 0.0-1.0, computed per rules above
   "price_per_sqft": number,
-  "reason": string                  // why this comp was chosen
-}
-
-Similarity scoring rules (scores are 0.0-1.0 decimals):
-- House Size (50% weight): score = max(0, 1 - abs(comp_sqft - subject_sqft) / subject_sqft / 0.20)
-- Bed+Bath Count (30% weight): score = max(0, 1 - abs((comp_beds+comp_baths) - (subject_beds+subject_baths)) / 3)
-- Lot Size (20% weight): score = max(0, 1 - abs(comp_lot - subject_lot) / subject_lot / 0.30)
-- Combined: total_score = 0.50 * size_score + 0.30 * bedbath_score + 0.20 * lot_score
-
-Price estimation rules:
-- Weight comps by similarity_score (higher = more weight)
-- Calculate weighted average price_per_sqft then multiply by subject sqft
-- Apply market trend adjustment for trend_adjusted value
-- Cap "most_likely" range at $200,000 wide maximum
-- Build sub-ranges with $100,000 bands outward from most_likely
-- Round all range boundaries to nearest $25,000
-
-Market temperature rules:
-- "hot": sale_to_list > 100% AND days_on_market < 14 AND yoy_change > +5%
-- "cool": sale_to_list < 97% OR days_on_market > 30 OR yoy_change < -2%
-- "warm": everything else`;
+  "reason": string                  // 1-2 sentences: why this comp was chosen
+}`;
 
 export async function POST(
   request: NextRequest,
@@ -197,16 +234,20 @@ export async function POST(
   const sqft = home.sqft || "Unknown";
   const beds = home.beds ?? "Unknown";
   const baths = home.baths ?? "Unknown";
+  const lotSqft = home.lot_sqft ?? "Unknown";
+  const propertyType = home.property_type || "Single Family";
 
   const userPrompt = `Perform a CMA for this subject property:
 
 Address: ${address}
+Property Type: ${propertyType}
 List Price: ${typeof price === "number" ? `$${price.toLocaleString()}` : price}
 Square Feet: ${sqft}
 Bedrooms: ${beds}
 Bathrooms: ${baths}
+Lot Size: ${typeof lotSqft === "number" ? `${lotSqft.toLocaleString()} sqft` : lotSqft}
 
-Find the top 8 comparable recently-sold homes in the same area and produce the CompsResult JSON.`;
+Find the top 8 comparable recently-sold homes (same property type, same neighborhood/zip code, sold within 6 months). Use ACTUAL SOLD prices only. Score each comp using the similarity formula, rank by score, and produce the CompsResult JSON. Remember to IGNORE the listing price when computing the price estimate.`;
 
   // Non-streaming mode
   if (!stream) {
