@@ -35,6 +35,12 @@ export default function CompsPage() {
   const [result, setResult] = useState<CompsResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editingSubject, setEditingSubject] = useState(false);
+  const [editBeds, setEditBeds] = useState("");
+  const [editBaths, setEditBaths] = useState("");
+  const [editSqft, setEditSqft] = useState("");
+  const [savingSubject, setSavingSubject] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const consoleRef = useRef<HTMLDivElement>(null);
   const rawRef = useRef<HTMLPreElement>(null);
@@ -55,6 +61,35 @@ export default function CompsPage() {
       rawRef.current.scrollTop = rawRef.current.scrollHeight;
     }
   }, [rawOutput]);
+
+  const handleSaveSubject = async () => {
+    setSavingSubject(true);
+    setSaveMsg(null);
+    try {
+      const res = await fetch(`/api/admin/candidate-homes/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          beds: editBeds ? parseInt(editBeds, 10) : null,
+          baths: editBaths ? parseFloat(editBaths) : null,
+          sqft: editSqft ? parseInt(editSqft, 10) : null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setSaveMsg({ type: "err", text: data.error || "Failed to save" });
+        return;
+      }
+      setEditingSubject(false);
+      setSaveMsg({ type: "ok", text: "Saved! Re-running CMA..." });
+      // Re-run comps with force refresh
+      fetchComps(true);
+    } catch {
+      setSaveMsg({ type: "err", text: "Failed to save" });
+    } finally {
+      setSavingSubject(false);
+    }
+  };
 
   const fetchComps = useCallback(
     async (force: boolean) => {
@@ -284,16 +319,66 @@ export default function CompsPage() {
       {/* CMA Report */}
       {r && !loading && (
         <div className="space-y-8">
-          {/* Subject Property */}
+          {/* Subject Property — editable */}
           <section>
-            <h3 className="text-xs uppercase tracking-[0.2em] text-[#d4a012] mb-3">Subject Property</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs uppercase tracking-[0.2em] text-[#d4a012]">Subject Property</h3>
+              {!editingSubject ? (
+                <button
+                  onClick={() => {
+                    setEditBeds(String(r.subject.beds ?? ""));
+                    setEditBaths(String(r.subject.baths ?? ""));
+                    setEditSqft(String(r.subject.sqft ?? ""));
+                    setEditingSubject(true);
+                    setSaveMsg(null);
+                  }}
+                  className="text-xs text-neutral-400 hover:text-[#d4a012] transition-colors uppercase tracking-wider"
+                >
+                  Edit
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  {saveMsg && <span className={`text-xs ${saveMsg.type === "ok" ? "text-green-600" : "text-red-500"}`}>{saveMsg.text}</span>}
+                  <button
+                    onClick={() => { setEditingSubject(false); setSaveMsg(null); }}
+                    className="text-xs text-neutral-400 hover:text-neutral-600 transition-colors uppercase tracking-wider"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveSubject}
+                    disabled={savingSubject}
+                    className="text-xs text-[#d4a012] hover:text-[#b8890f] transition-colors uppercase tracking-wider disabled:opacity-50"
+                  >
+                    {savingSubject ? "Saving..." : "Save & Re-run"}
+                  </button>
+                </div>
+              )}
+            </div>
             <div className="bg-neutral-50 border border-neutral-200 rounded p-4">
               <p className="font-serif text-lg text-neutral-900">{r.subject.address}</p>
-              <div className="flex gap-6 mt-2 text-sm text-neutral-600">
-                <span>{r.subject.sqft?.toLocaleString()} sqft</span>
-                <span>{r.subject.beds} bd / {r.subject.baths} ba</span>
-                {r.subject.lot_sqft && <span>{r.subject.lot_sqft.toLocaleString()} sqft lot</span>}
-              </div>
+              {editingSubject ? (
+                <div className="flex gap-3 mt-3">
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider text-neutral-400 mb-1">Beds</label>
+                    <input type="number" value={editBeds} onChange={(e) => setEditBeds(e.target.value)} className="w-20 border border-neutral-300 px-2 py-1.5 text-sm text-neutral-900 focus:outline-none focus:border-[#d4a012]" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider text-neutral-400 mb-1">Baths</label>
+                    <input type="number" step="0.5" value={editBaths} onChange={(e) => setEditBaths(e.target.value)} className="w-20 border border-neutral-300 px-2 py-1.5 text-sm text-neutral-900 focus:outline-none focus:border-[#d4a012]" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider text-neutral-400 mb-1">Sqft</label>
+                    <input type="number" value={editSqft} onChange={(e) => setEditSqft(e.target.value)} className="w-24 border border-neutral-300 px-2 py-1.5 text-sm text-neutral-900 focus:outline-none focus:border-[#d4a012]" />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-6 mt-2 text-sm text-neutral-600">
+                  <span>{r.subject.sqft?.toLocaleString()} sqft</span>
+                  <span>{r.subject.beds} bd / {r.subject.baths} ba</span>
+                  {r.subject.lot_sqft && <span>{r.subject.lot_sqft.toLocaleString()} sqft lot</span>}
+                </div>
+              )}
             </div>
           </section>
 

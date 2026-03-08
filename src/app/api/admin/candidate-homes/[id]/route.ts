@@ -56,6 +56,9 @@ export async function PATCH(
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (body.notes !== undefined) updates.notes = body.notes;
   if (body.status) updates.status = body.status;
+  if (body.beds !== undefined) updates.beds = body.beds;
+  if (body.baths !== undefined) updates.baths = body.baths;
+  if (body.sqft !== undefined) updates.sqft = body.sqft;
 
   const { data, error: updateError } = await supabase
     .from("candidate_homes")
