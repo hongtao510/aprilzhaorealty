@@ -19,19 +19,28 @@ export default function ClientListPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
     async function fetchClients() {
       try {
-        const res = await fetch("/api/admin/clients");
+        const res = await fetch("/api/admin/clients", { signal: controller.signal });
         if (res.ok) {
           setClients(await res.json());
         }
-      } catch {
-        // fail silently
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        // fail silently for other errors
       } finally {
         setLoading(false);
       }
     }
     fetchClients();
+
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, []);
 
   return (

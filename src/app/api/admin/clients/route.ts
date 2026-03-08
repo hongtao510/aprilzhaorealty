@@ -23,41 +23,58 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // Get all clients with counts
+  // Get all clients with counts in parallel batch queries
   const { data: clients } = await supabase
     .from("profiles")
     .select("*")
     .eq("role", "client")
     .order("created_at", { ascending: false });
 
-  // Get material and message counts for each client
-  const enrichedClients = await Promise.all(
-    (clients || []).map(async (client) => {
-      const { count: materialCount } = await supabase
-        .from("materials")
-        .select("*", { count: "exact", head: true })
-        .eq("client_id", client.id);
+  if (!clients || clients.length === 0) {
+    return NextResponse.json([]);
+  }
 
-      const { count: messageCount } = await supabase
-        .from("messages")
-        .select("*", { count: "exact", head: true })
-        .eq("client_id", client.id);
+  const clientIds = clients.map((c) => c.id);
 
-      const { count: unreadCount } = await supabase
-        .from("messages")
-        .select("*", { count: "exact", head: true })
-        .eq("client_id", client.id)
-        .eq("is_read", false)
-        .neq("sender_id", user.id);
+  // Run all count queries in parallel instead of N+1
+  const [materialsRes, messagesRes, unreadRes] = await Promise.all([
+    supabase
+      .from("materials")
+      .select("client_id")
+      .in("client_id", clientIds),
+    supabase
+      .from("messages")
+      .select("client_id")
+      .in("client_id", clientIds),
+    supabase
+      .from("messages")
+      .select("client_id")
+      .in("client_id", clientIds)
+      .eq("is_read", false)
+      .neq("sender_id", user.id),
+  ]);
 
-      return {
-        ...client,
-        material_count: materialCount || 0,
-        message_count: messageCount || 0,
-        unread_count: unreadCount || 0,
-      };
-    })
-  );
+  // Build count maps
+  const materialCounts: Record<string, number> = {};
+  const messageCounts: Record<string, number> = {};
+  const unreadCounts: Record<string, number> = {};
+
+  (materialsRes.data || []).forEach((m) => {
+    materialCounts[m.client_id] = (materialCounts[m.client_id] || 0) + 1;
+  });
+  (messagesRes.data || []).forEach((m) => {
+    messageCounts[m.client_id] = (messageCounts[m.client_id] || 0) + 1;
+  });
+  (unreadRes.data || []).forEach((m) => {
+    unreadCounts[m.client_id] = (unreadCounts[m.client_id] || 0) + 1;
+  });
+
+  const enrichedClients = clients.map((client) => ({
+    ...client,
+    material_count: materialCounts[client.id] || 0,
+    message_count: messageCounts[client.id] || 0,
+    unread_count: unreadCounts[client.id] || 0,
+  }));
 
   return NextResponse.json(enrichedClients);
 }

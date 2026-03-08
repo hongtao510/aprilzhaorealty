@@ -18,9 +18,12 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
     async function fetchStats() {
       try {
-        const res = await fetch("/api/admin/clients");
+        const res = await fetch("/api/admin/clients", { signal: controller.signal });
         if (res.ok) {
           const clients = await res.json();
           setStats({
@@ -35,13 +38,19 @@ export default function AdminDashboard() {
             ),
           });
         }
-      } catch {
-        // fail silently
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        // fail silently for other errors
       } finally {
         setLoading(false);
       }
     }
     fetchStats();
+
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, []);
 
   const cards = [

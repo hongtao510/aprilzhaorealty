@@ -21,11 +21,11 @@ export default function ClientDetailPage({
   const [activeTab, setActiveTab] = useState<Tab>("materials");
   const [loading, setLoading] = useState(true);
 
-  async function fetchClient() {
+  async function fetchClient(signal?: AbortSignal) {
     try {
       const [clientRes, homesRes] = await Promise.all([
-        fetch(`/api/admin/clients/${id}`),
-        fetch(`/api/admin/saved-homes?client_id=${id}`),
+        fetch(`/api/admin/clients/${id}`, { signal }),
+        fetch(`/api/admin/saved-homes?client_id=${id}`, { signal }),
       ]);
       if (clientRes.ok) {
         const data = await clientRes.json();
@@ -36,15 +36,23 @@ export default function ClientDetailPage({
         const homes = await homesRes.json();
         setSavedHomes(homes);
       }
-    } catch {
-      // fail silently
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      // fail silently for other errors
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    fetchClient();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    fetchClient(controller.signal);
+
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 

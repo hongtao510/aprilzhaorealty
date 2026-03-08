@@ -30,18 +30,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
 
   async function fetchProfile(userId: string) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
-    setProfile(data as Profile | null);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    try {
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single()
+        .abortSignal(controller.signal);
+      setProfile(data as Profile | null);
+    } catch (err) {
+      console.error("fetchProfile failed:", err);
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
   useEffect(() => {
+    let mounted = true;
     let settled = false;
+
     function settle() {
-      if (!settled) {
+      if (!settled && mounted) {
         settled = true;
         setLoading(false);
       }
@@ -56,6 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async function init() {
       try {
         const { data } = await supabase.auth.getUser();
+        if (!mounted) return;
         setUser(data.user);
         if (data.user) {
           await fetchProfile(data.user.id);
@@ -73,6 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
       async (_event: AuthChangeEvent, session: Session | null) => {
+        if (!mounted) return;
         const currentUser = session?.user ?? null;
         setUser(currentUser);
         if (currentUser) {
@@ -80,11 +93,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           setProfile(null);
         }
-        setLoading(false);
+        settle();
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

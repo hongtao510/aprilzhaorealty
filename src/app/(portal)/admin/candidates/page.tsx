@@ -51,16 +51,17 @@ export default function CandidatesPage() {
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
-  const fetchCandidates = useCallback(async () => {
+  const fetchCandidates = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     try {
       const statusParam = activeTab === "all" ? "" : `?status=${activeTab}`;
-      const res = await fetch(`/api/admin/candidate-homes${statusParam}`);
+      const res = await fetch(`/api/admin/candidate-homes${statusParam}`, { signal });
       if (res.ok) {
         const data = await res.json();
         setCandidates(data);
       }
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       console.error("Failed to fetch candidates:", err);
     } finally {
       setLoading(false);
@@ -68,17 +69,35 @@ export default function CandidatesPage() {
   }, [activeTab]);
 
   useEffect(() => {
-    fetchCandidates();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    fetchCandidates(controller.signal);
+
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, [fetchCandidates]);
 
   // Fetch clients for send panel
   useEffect(() => {
-    fetch("/api/admin/clients")
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    fetch("/api/admin/clients", { signal: controller.signal })
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) setClients(data);
       })
-      .catch(console.error);
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        console.error(err);
+      });
+
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, []);
 
   // --- Selection ---

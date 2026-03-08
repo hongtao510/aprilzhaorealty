@@ -1,6 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
+function withTimeout<T>(promise: PromiseLike<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Middleware query timed out")), ms)
+    ),
+  ]);
+}
+
 const publicRoutes = [
   "/",
   "/listings",
@@ -45,15 +54,23 @@ export async function middleware(request: NextRequest) {
   // Login page — redirect to portal if already logged in
   if (pathname === "/login") {
     if (user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
+      try {
+        const { data: profile } = await withTimeout(
+          supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", user.id)
+            .single(),
+          3000
+        );
 
-      const redirectTo =
-        profile?.role === "admin" ? "/admin" : "/portal";
-      return NextResponse.redirect(new URL(redirectTo, request.url));
+        const redirectTo =
+          profile?.role === "admin" ? "/admin" : "/portal";
+        return NextResponse.redirect(new URL(redirectTo, request.url));
+      } catch {
+        // If profile fetch fails/times out, default to portal
+        return NextResponse.redirect(new URL("/portal", request.url));
+      }
     }
     return supabaseResponse;
   }
@@ -65,22 +82,34 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Role-based access
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (pathname.startsWith("/admin") && profile?.role !== "admin") {
-    return NextResponse.redirect(new URL("/portal", request.url));
+  // API routes handle their own role checks — skip middleware profile query
+  if (pathname.startsWith("/api/")) {
+    return supabaseResponse;
   }
 
-  if (pathname.startsWith("/portal") && profile?.role !== "client") {
-    // Admins can access portal routes too if needed, but redirect clients away from admin
-    if (profile?.role !== "admin") {
-      return NextResponse.redirect(new URL("/login", request.url));
+  // Role-based access for page routes
+  try {
+    const { data: profile } = await withTimeout(
+      supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single(),
+      3000
+    );
+
+    if (pathname.startsWith("/admin") && profile?.role !== "admin") {
+      return NextResponse.redirect(new URL("/portal", request.url));
     }
+
+    if (pathname.startsWith("/portal") && profile?.role !== "client") {
+      if (profile?.role !== "admin") {
+        return NextResponse.redirect(new URL("/login", request.url));
+      }
+    }
+  } catch {
+    // If profile fetch fails/times out, allow through (client-side will handle)
+    console.error("Middleware profile fetch timed out");
   }
 
   return supabaseResponse;

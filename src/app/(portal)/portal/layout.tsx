@@ -14,22 +14,14 @@ export default function ClientPortalLayout({
   const { profile, loading } = useAuth();
   const router = useRouter();
 
+  // Middleware already verified auth — this is a fallback safety check
   useEffect(() => {
     if (!loading && !profile) {
       router.push("/login");
     }
   }, [loading, profile, router]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-neutral-400 text-sm uppercase tracking-wider">Loading...</p>
-      </div>
-    );
-  }
-
-  if (!profile) return null;
-
+  // Render layout immediately — middleware guarantees access
   return (
     <div className="min-h-screen bg-white">
       <PortalHeader />

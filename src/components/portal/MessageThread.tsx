@@ -16,25 +16,32 @@ export default function MessageThread({ clientId, apiBase }: MessageThreadProps)
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  async function fetchMessages() {
+  async function fetchMessages(signal?: AbortSignal) {
     try {
-      const res = await fetch(`${apiBase}?client_id=${clientId}`);
+      const res = await fetch(`${apiBase}?client_id=${clientId}`, { signal });
       if (res.ok) {
         const data = await res.json();
         setMessages(data);
       }
-    } catch {
-      // silently fail on poll
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    fetchMessages();
-    const interval = setInterval(fetchMessages, 10000);
-    return () => clearInterval(interval);
+    abortRef.current = new AbortController();
+    fetchMessages(abortRef.current.signal);
+    const interval = setInterval(() => {
+      fetchMessages(abortRef.current?.signal);
+    }, 10000);
+    return () => {
+      abortRef.current?.abort();
+      clearInterval(interval);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId]);
 

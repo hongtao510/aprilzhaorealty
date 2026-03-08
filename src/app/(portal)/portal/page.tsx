@@ -12,12 +12,15 @@ export default function ClientDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const controller = new AbortController();
+    const { signal } = controller;
+
     async function fetchStats() {
       try {
         const [matRes, msgRes, homesRes] = await Promise.all([
-          fetch("/api/portal/materials"),
-          fetch("/api/portal/messages"),
-          fetch("/api/portal/saved-homes"),
+          fetch("/api/portal/materials", { signal }),
+          fetch("/api/portal/messages", { signal }),
+          fetch("/api/portal/saved-homes", { signal }),
         ]);
         if (matRes.ok) {
           const mats = await matRes.json();
@@ -36,14 +39,16 @@ export default function ClientDashboard() {
           const homes = await homesRes.json();
           setSavedHomesCount(homes.length);
         }
-      } catch {
-        // fail silently
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
       } finally {
         setLoading(false);
       }
     }
     if (profile) fetchStats();
-  }, [profile]);
+
+    return () => controller.abort();
+  }, [profile?.id]);
 
   return (
     <div>

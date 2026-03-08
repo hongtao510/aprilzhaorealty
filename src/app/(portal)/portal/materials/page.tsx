@@ -17,19 +17,29 @@ export default function ClientMaterialsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const controller = new AbortController();
+    const { signal } = controller;
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
     async function fetchMaterials() {
       try {
-        const res = await fetch("/api/portal/materials");
+        const res = await fetch("/api/portal/materials", { signal });
         if (res.ok) {
           setMaterials(await res.json());
         }
-      } catch {
-        // fail silently
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
       } finally {
+        clearTimeout(timeout);
         setLoading(false);
       }
     }
     fetchMaterials();
+
+    return () => {
+      controller.abort();
+      clearTimeout(timeout);
+    };
   }, []);
 
   function formatFileSize(bytes: number) {

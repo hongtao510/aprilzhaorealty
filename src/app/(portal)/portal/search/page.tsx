@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import type { SavedHomePreview } from "@/lib/types";
 
 export default function SearchPage() {
@@ -12,9 +12,19 @@ export default function SearchPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
   const fetchPreview = useCallback(async (inputUrl: string) => {
     if (!inputUrl.startsWith("http")) return;
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
     setLoadingPreview(true);
     setError("");
     try {
@@ -22,13 +32,14 @@ export default function SearchPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: inputUrl }),
+        signal: abortRef.current.signal,
       });
       if (res.ok) {
         const data = await res.json();
         setPreview(data);
       }
-    } catch {
-      // preview fetch failed silently
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
     } finally {
       setLoadingPreview(false);
     }
