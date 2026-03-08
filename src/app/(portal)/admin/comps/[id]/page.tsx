@@ -395,7 +395,8 @@ export default function CompsPage() {
                     <th className="pb-2 pr-3 text-right">Sqft</th>
                     <th className="pb-2 pr-3">Bed/Bath</th>
                     <th className="pb-2 pr-3 text-right">$/Sqft</th>
-                    <th className="pb-2 text-right">Score</th>
+                    <th className="pb-2 pr-3 text-right">Score</th>
+                    <th className="pb-2">Source</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
@@ -408,10 +409,19 @@ export default function CompsPage() {
                       <td className="py-2 pr-3 text-right">{comp.sqft.toLocaleString()}</td>
                       <td className="py-2 pr-3">{comp.beds}/{comp.baths}</td>
                       <td className="py-2 pr-3 text-right">${comp.price_per_sqft}</td>
-                      <td className="py-2 text-right">
+                      <td className="py-2 pr-3 text-right">
                         <span className="inline-block px-2 py-0.5 text-xs rounded bg-[#d4a012]/10 text-[#d4a012] font-medium">
                           {Math.round(comp.similarity_score * 100)}%
                         </span>
+                      </td>
+                      <td className="py-2">
+                        {comp.redfin_url ? (
+                          <a href={comp.redfin_url} target="_blank" rel="noopener noreferrer" className="text-[#d4a012] hover:text-[#b8890f] text-xs underline">
+                            Redfin
+                          </a>
+                        ) : (
+                          <span className="text-neutral-300 text-xs">—</span>
+                        )}
                       </td>
                     </tr>
                   ))}

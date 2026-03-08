@@ -142,6 +142,7 @@ export interface CompHome {
   similarity_score: number;
   price_per_sqft: number;
   reason: string;
+  redfin_url?: string;
 }
 
 export interface CompsEstimate {

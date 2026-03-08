@@ -129,7 +129,8 @@ CompHome:
   "lot_sqft": number,
   "similarity_score": number,       // 0.0-1.0, computed per rules above
   "price_per_sqft": number,
-  "reason": string                  // 1-2 sentences: why this comp was chosen
+  "reason": string,                 // 1-2 sentences: why this comp was chosen
+  "redfin_url": string              // Redfin listing URL for this comp, e.g. "https://www.redfin.com/CA/City/123-Street-Zip/home/12345"
 }`;
 
 export async function POST(
@@ -236,6 +237,9 @@ export async function POST(
   const baths = home.baths ?? "Unknown";
   const lotSqft = home.lot_sqft ?? "Unknown";
   const propertyType = home.property_type || "Single Family";
+  const sourceUrl = home.url || null;
+
+  const hasUnknowns = [sqft, beds, baths, lotSqft].some((v) => v === "Unknown" || v === null);
 
   const userPrompt = `Perform a CMA for this subject property:
 
@@ -246,6 +250,8 @@ Square Feet: ${sqft}
 Bedrooms: ${beds}
 Bathrooms: ${baths}
 Lot Size: ${typeof lotSqft === "number" ? `${lotSqft.toLocaleString()} sqft` : lotSqft}
+${sourceUrl ? `Source URL: ${sourceUrl}` : ""}
+${hasUnknowns ? `\nIMPORTANT: Some property details above are "Unknown". You MUST research the correct details for this property based on the address. Use your knowledge of the property from public records, Redfin, Zillow, or MLS data. Do NOT use placeholder or estimated values for the subject property — find the actual beds, baths, sqft, and lot size. The "subject" field in your response MUST contain the correct, researched values.` : ""}
 
 Find the top 8 comparable recently-sold homes (same property type, same neighborhood/zip code, sold within 6 months). Use ACTUAL SOLD prices only. Score each comp using the similarity formula, rank by score, and produce the CompsResult JSON. Remember to IGNORE the listing price when computing the price estimate.`;
 
