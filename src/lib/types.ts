@@ -143,6 +143,7 @@ export interface CompHome {
   price_per_sqft: number;
   reason: string;
   redfin_url?: string;
+  distance_miles?: number;
 }
 
 export interface CompsEstimate {

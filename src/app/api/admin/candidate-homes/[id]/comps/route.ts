@@ -2,6 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import Anthropic from "@anthropic-ai/sdk";
 import type { CompsResult } from "@/lib/types";
+import {
+  getPropertyRecord,
+  getValueEstimate,
+  getMarketStatistics,
+  type RentCastAVMResult,
+  type RentCastProperty,
+  type RentCastMarketStats,
+} from "@/lib/rentcast";
+import {
+  getClosedListings,
+  type SimplyRetsListing,
+} from "@/lib/simplyrets";
 
 const VALID_MODELS = [
   "claude-opus-4-6",
@@ -33,15 +45,62 @@ async function verifyAdmin() {
   return { supabase, user, error: null, status: null };
 }
 
-const SYSTEM_PROMPT = `You are a real estate Comparative Market Analysis (CMA) expert. Given a subject property, produce a JSON object matching the CompsResult schema exactly. Return ONLY valid JSON — no markdown, no explanation, no code fences.
+async function fetchRentCastData(address: string, zipCode?: string) {
+  const [property, avm, market] = await Promise.all([
+    getPropertyRecord(address),
+    getValueEstimate(address, { compCount: 20 }),
+    zipCode ? getMarketStatistics(zipCode) : Promise.resolve(null),
+  ]);
+  return { property, avm, market };
+}
 
-=== COMP SEARCH CRITERIA (in priority order) ===
-1. Same neighborhood, ideally within 0.5 miles of the subject property
-2. Same zip code preferred, but nearby zip codes acceptable
-3. Same property type (Single Family, Condo, Townhouse, etc.)
-4. SOLD within the last 6 months (extend to 12 months if insufficient comps)
-5. CRITICAL: Use actual SOLD prices only — never listing/ask prices
-6. Collect at least 15-20 candidates, then filter to top 8 by similarity score
+async function fetchSimplyRetsComps(opts: {
+  city?: string;
+  postalCode?: string;
+  state?: string;
+  beds?: number;
+  sqft?: number;
+  propertyType?: string;
+}): Promise<SimplyRetsListing[]> {
+  // Search for recently closed listings in the same area
+  // Widen bed/bath range by ±1 to get more candidates for scoring
+  const minBeds = opts.beds ? Math.max(0, opts.beds - 1) : undefined;
+  const maxBeds = opts.beds ? opts.beds + 1 : undefined;
+  // Widen sqft range by ±30% for broader search
+  const minArea = opts.sqft ? Math.round(opts.sqft * 0.7) : undefined;
+  const maxArea = opts.sqft ? Math.round(opts.sqft * 1.3) : undefined;
+
+  // Map property type to SimplyRETS type
+  let type: string | undefined;
+  const pt = (opts.propertyType || "").toLowerCase();
+  if (pt.includes("condo")) type = "condominium";
+  else if (pt.includes("town")) type = "residential";
+  else if (pt.includes("multi")) type = "multifamily";
+  else type = "residential";
+
+  return getClosedListings({
+    city: opts.city,
+    postalCode: opts.postalCode,
+    state: opts.state,
+    minBeds,
+    maxBeds,
+    minArea,
+    maxArea,
+    type,
+    limit: 50,
+    sort: "-closedate",
+  });
+}
+
+const SYSTEM_PROMPT = `You are a real estate Comparative Market Analysis (CMA) expert. You will receive REAL property data from RentCast API — real comparable sales, real property records, and real market statistics. Your job is to ANALYZE this real data and produce a structured CMA report.
+
+Return ONLY valid JSON matching the CompsResult schema — no markdown, no code fences, no explanation.
+
+=== YOUR TASK ===
+1. You will receive the subject property details (from RentCast property records)
+2. You will receive a list of comparable properties with sale prices (from RentCast AVM)
+3. You may receive market statistics (from RentCast market data)
+4. Score each comp, select the top 8, compute a price estimate, and produce the JSON output
 
 === SIMILARITY SCORING (scores are 0.0-1.0 decimals) ===
 Criterion 1 — House Size (50% weight):
@@ -61,7 +120,7 @@ Criterion 3 — Lot Size (20% weight):
 
 Combined: total_score = 0.50 * size_score + 0.30 * bedbath_score + 0.20 * lot_score
 Filter out any comp where ALL three scores = 0.
-Tie-breaking: closer proximity wins, then more recent sale date wins.
+Tie-breaking: closer distance wins, then more recent sale date wins.
 
 === PRICE ESTIMATION ===
 1. IGNORE the subject property's listing price — it can be misleading
@@ -71,7 +130,7 @@ Tie-breaking: closer proximity wins, then more recent sale date wins.
 5. Round estimate to nearest $1,000
 
 === MARKET TREND ADJUSTMENT ===
-Classify market temperature using recent month-over-month data:
+Use the provided market statistics to classify market temperature:
 - "hot": median price up >2% MoM, homes selling above list, <14 days on market → adjust UP 2-5%
 - "warm": median price up 0-2% MoM, selling near list, 14-30 days on market → NO adjustment
 - "cool": median price flat/declining MoM, selling below list, >30 days on market → adjust DOWN 2-5%
@@ -93,7 +152,7 @@ trend_adjusted = comp_based * (1 + trend_adjustment_pct / 100)
 === OUTPUT SCHEMA ===
 CompsResult:
 {
-  "comps": [CompHome, ...],          // exactly 8 comparable recently-sold homes
+  "comps": [CompHome, ...],          // top 8 comparable recently-sold homes from the provided data
   "subject": { "address": string, "sqft": number, "beds": number, "baths": number, "lot_sqft": number },
   "estimate": {
     "weighted_price_per_sqft": number,
@@ -130,8 +189,141 @@ CompHome:
   "similarity_score": number,       // 0.0-1.0, computed per rules above
   "price_per_sqft": number,
   "reason": string,                 // 1-2 sentences: why this comp was chosen
-  "redfin_url": string              // Redfin listing URL for this comp, e.g. "https://www.redfin.com/CA/City/123-Street-Zip/home/12345"
+  "redfin_url": string,             // Redfin listing URL for this comp
+  "distance_miles": number          // Distance from subject property in miles
 }`;
+
+function formatSimplyRetsLot(listing: SimplyRetsListing): string {
+  if (listing.property.lotSizeArea && listing.property.lotSizeAreaUnits) {
+    if (listing.property.lotSizeAreaUnits.toLowerCase().includes("squa")) {
+      return `${listing.property.lotSizeArea.toLocaleString()} sqft`;
+    }
+  }
+  if (listing.property.acres) {
+    return `${(listing.property.acres * 43560).toLocaleString()} sqft`;
+  }
+  if (listing.property.lotSize) return listing.property.lotSize;
+  return "N/A";
+}
+
+function buildUserPrompt(opts: {
+  address: string;
+  price: string | number;
+  subjectBeds: number | string;
+  subjectBaths: number | string;
+  subjectSqft: number | string;
+  subjectLot: number | string;
+  subjectYearBuilt: number | string;
+  propertyType: string;
+  sourceUrl: string | null;
+  rentcastAVM: RentCastAVMResult | null;
+  rentcastMarket: RentCastMarketStats | null;
+  rentcastError: string | null;
+  simplyRetsListings: SimplyRetsListing[];
+  simplyRetsError: string | null;
+}) {
+  const {
+    address, price, subjectBeds, subjectBaths, subjectSqft, subjectLot,
+    subjectYearBuilt, propertyType, sourceUrl,
+    rentcastAVM, rentcastMarket, rentcastError,
+    simplyRetsListings, simplyRetsError,
+  } = opts;
+
+  let prompt = `Perform a CMA for this subject property:
+
+Address: ${address}
+Property Type: ${propertyType}
+List Price: ${typeof price === "number" ? `$${price.toLocaleString()}` : price}
+Square Feet: ${subjectSqft}
+Bedrooms: ${subjectBeds}
+Bathrooms: ${subjectBaths}
+Lot Size: ${typeof subjectLot === "number" ? `${subjectLot.toLocaleString()} sqft` : subjectLot}
+Year Built: ${subjectYearBuilt}
+${sourceUrl ? `Source URL: ${sourceUrl}` : ""}`;
+
+  // --- SimplyRETS MLS closed listings (most authoritative) ---
+  const mlsComps = simplyRetsListings.filter(
+    (l) => l.sales.closePrice && l.sales.closePrice > 0
+  );
+
+  if (mlsComps.length > 0) {
+    prompt += `
+
+=== MLS CLOSED SALES DATA (from SimplyRETS — authoritative MLS records) ===
+${mlsComps.length} recently closed MLS listings found. These have verified close prices from the MLS. Prioritize these over other data sources.
+
+${mlsComps.map((l, i) => `${i + 1}. ${l.address.full}, ${l.address.city}, ${l.address.state} ${l.address.postalCode}
+   Close Price: $${l.sales.closePrice!.toLocaleString()}
+   Close Date: ${l.sales.closeDate || "N/A"}
+   List Price: $${l.listPrice.toLocaleString()} | Days on Market: ${l.mls.daysOnMarket}
+   Sqft: ${l.property.area} | Beds: ${l.property.bedrooms} | Baths: ${l.property.bathrooms}
+   Lot: ${formatSimplyRetsLot(l)}
+   Year Built: ${l.property.yearBuilt || "N/A"}
+   MLS#: ${l.listingId} | Status: ${l.mls.statusText || l.mls.status}
+`).join("\n")}`;
+  } else if (simplyRetsError) {
+    prompt += `
+
+Note: SimplyRETS MLS data unavailable (${simplyRetsError}).`;
+  }
+
+  // --- RentCast AVM comparables (supplementary) ---
+  const hasRentCastComps = rentcastAVM && rentcastAVM.comparables?.length > 0;
+
+  if (hasRentCastComps) {
+    prompt += `
+
+=== ADDITIONAL COMPARABLE DATA (from RentCast AVM) ===
+RentCast AVM Estimate: $${rentcastAVM!.price.toLocaleString()} (range: $${rentcastAVM!.priceRangeLow.toLocaleString()} - $${rentcastAVM!.priceRangeHigh.toLocaleString()})
+
+${rentcastAVM!.comparables.length} additional comparable properties${mlsComps.length > 0 ? " (use these to supplement the MLS data above — avoid duplicates)" : ""}:
+
+${rentcastAVM!.comparables.map((c, i) => `${i + 1}. ${c.formattedAddress}
+   Sold Price: $${(c.lastSalePrice || c.price).toLocaleString()}
+   Sold Date: ${c.lastSaleDate || "N/A"}
+   Sqft: ${c.squareFootage} | Beds: ${c.bedrooms} | Baths: ${c.bathrooms}
+   Lot: ${c.lotSize ? c.lotSize.toLocaleString() + " sqft" : "N/A"}
+   Distance: ${c.distance.toFixed(2)} miles | RentCast Correlation: ${c.correlation}
+   City: ${c.city}, ${c.state} ${c.zipCode}
+`).join("\n")}`;
+  }
+
+  // --- Market statistics ---
+  if (rentcastMarket?.saleSummary) {
+    const ms = rentcastMarket.saleSummary;
+    prompt += `
+
+=== MARKET STATISTICS (from RentCast API) ===
+Average Price: ${ms.averagePrice ? `$${ms.averagePrice.toLocaleString()}` : "N/A"}
+Median Price: ${ms.medianPrice ? `$${ms.medianPrice.toLocaleString()}` : "N/A"}
+Avg Price/SqFt: ${ms.averagePricePerSquareFoot ? `$${ms.averagePricePerSquareFoot}` : "N/A"}
+Avg Days on Market: ${ms.averageDaysOnMarket ?? "N/A"}
+Total Active Listings: ${ms.totalListings ?? "N/A"}`;
+  }
+
+  // --- Fallback if no data from either source ---
+  if (mlsComps.length === 0 && !hasRentCastComps) {
+    prompt += `
+
+NOTE: No comparable data was available from SimplyRETS${simplyRetsError ? ` (${simplyRetsError})` : ""} or RentCast${rentcastError ? ` (${rentcastError})` : ""}. Use your knowledge of recently sold homes in this area to find comparables. Use ACTUAL SOLD prices only.`;
+  }
+
+  const hasUnknowns = [subjectSqft, subjectBeds, subjectBaths, subjectLot].some(
+    (v) => v === "Unknown" || v === null
+  );
+
+  if (hasUnknowns) {
+    prompt += `
+
+IMPORTANT: Some property details above are "Unknown". You MUST research the correct details for this property based on the address. The "subject" field in your response MUST contain the correct values.`;
+  }
+
+  prompt += `
+
+Score each comp using the similarity formula, rank by score, select the top 8, and produce the CompsResult JSON. When MLS data and RentCast data overlap (same address), prefer the MLS close price. Remember to IGNORE the listing price when computing the price estimate.`;
+
+  return prompt;
+}
 
 export async function POST(
   request: NextRequest,
@@ -184,7 +376,6 @@ export async function POST(
 
     if (cached) {
       if (stream) {
-        // Return SSE with cached result
         const encoder = new TextEncoder();
         const body = new ReadableStream({
           start(controller) {
@@ -229,31 +420,80 @@ export async function POST(
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 
-  // Build user prompt
+  // === Fetch real data from RentCast + SimplyRETS ===
   const address = home.address || home.title || "Unknown address";
   const price = home.price || home.price_numeric || "Unknown";
-  const sqft = home.sqft || "Unknown";
-  const beds = home.beds ?? "Unknown";
-  const baths = home.baths ?? "Unknown";
-  const lotSqft = home.lot_sqft ?? "Unknown";
-  const propertyType = home.property_type || "Single Family";
   const sourceUrl = home.url || null;
 
-  const hasUnknowns = [sqft, beds, baths, lotSqft].some((v) => v === "Unknown" || v === null);
+  // Parse city, state, zip from address
+  const zipMatch = (home.address || "").match(/\b(\d{5})\b/);
+  const zipCode = zipMatch?.[1] || null;
+  // Try to extract city from address like "123 Main St, Burlingame, CA 94010"
+  const cityMatch = (home.address || "").match(/,\s*([A-Za-z\s]+),\s*[A-Z]{2}\s*\d{5}/);
+  const city = cityMatch?.[1]?.trim() || null;
+  const stateMatch = (home.address || "").match(/,\s*([A-Z]{2})\s*\d{5}/);
+  const state = stateMatch?.[1] || null;
 
-  const userPrompt = `Perform a CMA for this subject property:
+  // Fetch data from both sources in parallel
+  const rcPromise = process.env.RENTCAST_API_KEY
+    ? fetchRentCastData(address, zipCode ?? undefined).catch((err) => ({
+        property: null as RentCastProperty | null,
+        avm: null as RentCastAVMResult | null,
+        market: null as RentCastMarketStats | null,
+        error: err instanceof Error ? err.message : "RentCast API error",
+      }))
+    : Promise.resolve({ property: null as RentCastProperty | null, avm: null as RentCastAVMResult | null, market: null as RentCastMarketStats | null, error: null as string | null });
 
-Address: ${address}
-Property Type: ${propertyType}
-List Price: ${typeof price === "number" ? `$${price.toLocaleString()}` : price}
-Square Feet: ${sqft}
-Bedrooms: ${beds}
-Bathrooms: ${baths}
-Lot Size: ${typeof lotSqft === "number" ? `${lotSqft.toLocaleString()} sqft` : lotSqft}
-${sourceUrl ? `Source URL: ${sourceUrl}` : ""}
-${hasUnknowns ? `\nIMPORTANT: Some property details above are "Unknown". You MUST research the correct details for this property based on the address. Use your knowledge of the property from public records, Redfin, Zillow, or MLS data. Do NOT use placeholder or estimated values for the subject property — find the actual beds, baths, sqft, and lot size. The "subject" field in your response MUST contain the correct, researched values.` : ""}
+  const srPromise = (process.env.SIMPLYRETS_USERNAME && process.env.SIMPLYRETS_PASSWORD)
+    ? fetchSimplyRetsComps({
+        city: city ?? undefined,
+        postalCode: zipCode ?? undefined,
+        state: state ?? undefined,
+        beds: typeof home.beds === "number" ? home.beds : undefined,
+        sqft: typeof home.sqft === "number" ? home.sqft : undefined,
+        propertyType: home.property_type ?? undefined,
+      }).catch((err) => {
+        return { listings: [] as SimplyRetsListing[], error: err instanceof Error ? err.message : "SimplyRETS API error" };
+      }).then((result) => Array.isArray(result) ? { listings: result, error: null as string | null } : result)
+    : Promise.resolve({ listings: [] as SimplyRetsListing[], error: null as string | null });
 
-Find the top 8 comparable recently-sold homes (same property type, same neighborhood/zip code, sold within 6 months). Use ACTUAL SOLD prices only. Score each comp using the similarity formula, rank by score, and produce the CompsResult JSON. Remember to IGNORE the listing price when computing the price estimate.`;
+  const [rcResult, srResult] = await Promise.all([rcPromise, srPromise]);
+
+  const rentcastProperty = "error" in rcResult && rcResult.error ? null : rcResult.property;
+  const rentcastAVM = "error" in rcResult && rcResult.error ? null : rcResult.avm;
+  const rentcastMarket = "error" in rcResult && rcResult.error ? null : rcResult.market;
+  const rentcastError = ("error" in rcResult ? rcResult.error : null) as string | null;
+  const simplyRetsListings = srResult.listings;
+  const simplyRetsError = srResult.error;
+
+  // Use RentCast data to fill in subject property details (override scraped/null values)
+  const subjectBeds = rentcastProperty?.bedrooms ?? home.beds ?? "Unknown";
+  const subjectBaths = rentcastProperty?.bathrooms ?? home.baths ?? "Unknown";
+  const subjectSqft = rentcastProperty?.squareFootage ?? home.sqft ?? "Unknown";
+  const subjectLot = rentcastProperty?.lotSize ?? home.lot_sqft ?? "Unknown";
+  const subjectYearBuilt = rentcastProperty?.yearBuilt ?? "Unknown";
+  const propertyType = rentcastProperty?.propertyType ?? home.property_type ?? "Single Family";
+
+  // Update candidate_homes with RentCast data if we got better info
+  if (rentcastProperty) {
+    const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (!home.beds && rentcastProperty.bedrooms) updates.beds = rentcastProperty.bedrooms;
+    if (!home.baths && rentcastProperty.bathrooms) updates.baths = rentcastProperty.bathrooms;
+    if (!home.sqft && rentcastProperty.squareFootage) updates.sqft = rentcastProperty.squareFootage;
+    if (Object.keys(updates).length > 1) {
+      await supabase.from("candidate_homes").update(updates).eq("id", id);
+    }
+  }
+
+  const userPrompt = buildUserPrompt({
+    address, price, subjectBeds, subjectBaths, subjectSqft, subjectLot,
+    subjectYearBuilt, propertyType, sourceUrl,
+    rentcastAVM, rentcastMarket, rentcastError,
+    simplyRetsListings, simplyRetsError,
+  });
+
+  const hasRentCastComps = rentcastAVM && rentcastAVM.comparables?.length > 0;
+  const hasMLSComps = simplyRetsListings.filter((l) => l.sales.closePrice && l.sales.closePrice > 0).length > 0;
 
   // Non-streaming mode
   if (!stream) {
@@ -303,7 +543,6 @@ Find the top 8 comparable recently-sold homes (same property type, same neighbor
   const encoder = new TextEncoder();
   const abortController = new AbortController();
 
-  // Listen for client disconnect
   request.signal.addEventListener("abort", () => {
     abortController.abort();
   });
@@ -320,8 +559,40 @@ Find the top 8 comparable recently-sold homes (same property type, same neighbor
 
       try {
         send("log", { message: `Subject: ${address}` });
-        send("log", { message: `Details: ${beds} bed / ${baths} bath / ${sqft} sqft` });
+        send("log", { message: `Details: ${subjectBeds} bed / ${subjectBaths} bath / ${subjectSqft} sqft` });
         send("log", { message: `Listed at: ${typeof price === "number" ? `$${price.toLocaleString()}` : price}` });
+
+        // Data source status logs
+        send("log", { message: "" });
+        if (rentcastProperty) {
+          send("log", { message: "RentCast: Subject property data loaded" });
+          send("log", { message: `  Year Built: ${subjectYearBuilt} | Lot: ${typeof subjectLot === "number" ? subjectLot.toLocaleString() + " sqft" : subjectLot}` });
+        }
+        if (rentcastAVM) {
+          send("log", { message: `RentCast: AVM estimate $${rentcastAVM.price.toLocaleString()} (${rentcastAVM.comparables.length} comps)` });
+        }
+        if (rentcastMarket) {
+          send("log", { message: `RentCast: Market statistics loaded for zip ${zipCode}` });
+        }
+        if (rentcastError) {
+          send("log", { message: `Warning: RentCast API: ${rentcastError}` });
+        }
+
+        const mlsCompCount = simplyRetsListings.filter((l) => l.sales.closePrice && l.sales.closePrice > 0).length;
+        if (mlsCompCount > 0) {
+          send("log", { message: `SimplyRETS: ${mlsCompCount} closed MLS listings loaded` });
+        }
+        if (simplyRetsError) {
+          send("log", { message: `Warning: SimplyRETS: ${simplyRetsError}` });
+        }
+        if (!process.env.SIMPLYRETS_USERNAME) {
+          send("log", { message: "SimplyRETS: Not configured (set SIMPLYRETS_USERNAME/PASSWORD)" });
+        }
+
+        if (!hasRentCastComps && !hasMLSComps) {
+          send("log", { message: "Note: No external comp data — Claude will use training data" });
+        }
+
         send("log", { message: "" });
         send("log", { message: `Connecting to Claude API (${model})...` });
 
@@ -330,7 +601,7 @@ Find the top 8 comparable recently-sold homes (same property type, same neighbor
 
         send("log", { message: "Streaming response from Claude..." });
 
-        const stream = anthropic.messages.stream({
+        const sseStream = anthropic.messages.stream({
           model,
           max_tokens: 8192,
           temperature: 0,
@@ -339,7 +610,7 @@ Find the top 8 comparable recently-sold homes (same property type, same neighbor
         }, { signal: abortController.signal });
 
         let tokenCount = 0;
-        for await (const event of stream) {
+        for await (const event of sseStream) {
           if (abortController.signal.aborted) {
             send("log", { message: "Analysis stopped by user" });
             send("done", {});
@@ -350,9 +621,7 @@ Find the top 8 comparable recently-sold homes (same property type, same neighbor
           if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
             rawResponse += event.delta.text;
             tokenCount += 1;
-            // Stream raw tokens to client
             send("token", { text: event.delta.text });
-            // Send token count updates periodically
             if (tokenCount % 100 === 0) {
               send("log", { message: `Generating... (${tokenCount} tokens)` });
             }
@@ -362,7 +631,6 @@ Find the top 8 comparable recently-sold homes (same property type, same neighbor
         send("log", { message: `Response complete (${tokenCount} tokens)` });
         send("log", { message: "Parsing JSON response..." });
 
-        // Parse response
         let compsResult: CompsResult;
         try {
           const cleaned = rawResponse.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
@@ -387,7 +655,6 @@ Find the top 8 comparable recently-sold homes (same property type, same neighbor
         send("log", { message: "" });
         send("log", { message: "Saving to cache..." });
 
-        // Cache result
         await supabase.from("candidate_comps").delete().eq("candidate_home_id", id);
         const { error: insertError } = await supabase.from("candidate_comps").insert({
           candidate_home_id: id,

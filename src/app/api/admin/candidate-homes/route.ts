@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getPropertyRecord } from "@/lib/rentcast";
 
 async function verifyAdmin() {
   const supabase = await createClient();
@@ -157,6 +158,20 @@ export async function POST(request: NextRequest) {
     }
   } catch {
     // Preview scraping is best-effort
+  }
+
+  // Enrich with RentCast property data (more accurate than OG scraping)
+  if (process.env.RENTCAST_API_KEY && preview.address) {
+    try {
+      const rcProperty = await getPropertyRecord(preview.address);
+      if (rcProperty) {
+        if (!preview.beds && rcProperty.bedrooms) preview.beds = rcProperty.bedrooms;
+        if (!preview.baths && rcProperty.bathrooms) preview.baths = rcProperty.bathrooms;
+        if (!preview.sqft && rcProperty.squareFootage) preview.sqft = rcProperty.squareFootage;
+      }
+    } catch {
+      // RentCast enrichment is best-effort
+    }
   }
 
   // Parse numeric price

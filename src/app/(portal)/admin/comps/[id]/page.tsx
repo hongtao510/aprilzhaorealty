@@ -482,6 +482,7 @@ export default function CompsPage() {
                     <th className="pb-2 pr-3 text-right">$/Sqft</th>
                     <th className="pb-2 pr-3 text-right">Score</th>
                     <th className="pb-2">Source</th>
+                    <th className="pb-2 text-right">Distance</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
@@ -507,6 +508,9 @@ export default function CompsPage() {
                         ) : (
                           <span className="text-neutral-300 text-xs">—</span>
                         )}
+                      </td>
+                      <td className="py-2 text-right text-xs text-neutral-400">
+                        {comp.distance_miles ? `${comp.distance_miles.toFixed(1)} mi` : "—"}
                       </td>
                     </tr>
                   ))}
