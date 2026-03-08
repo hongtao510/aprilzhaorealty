@@ -106,7 +106,7 @@ export async function POST(
   const { searchParams } = new URL(request.url);
   const force = searchParams.get("force") === "true";
   const stream = searchParams.get("stream") === "true";
-  const modelParam = searchParams.get("model") || "claude-opus-4-6";
+  const modelParam = searchParams.get("model") || "claude-sonnet-4-6";
 
   if (!VALID_MODELS.includes(modelParam as ValidModel)) {
     return NextResponse.json(
