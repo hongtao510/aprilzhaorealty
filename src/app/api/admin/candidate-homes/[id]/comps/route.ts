@@ -118,9 +118,29 @@ Criterion 3 — Lot Size (20% weight):
   score = max(0, 1 - lot_diff / 0.30)
   Similar if within 30% of subject lot size
 
-Combined: total_score = 0.50 * size_score + 0.30 * bedbath_score + 0.20 * lot_score
+Combined: similarity_score = 0.50 * size_score + 0.30 * bedbath_score + 0.20 * lot_score
 Filter out any comp where ALL three scores = 0.
-Tie-breaking: closer distance wins, then more recent sale date wins.
+
+=== RECENCY SCORING ===
+Apply a recency multiplier to the similarity score based on how recently the comp sold:
+  months_ago = months between comp sold date and today
+  if months_ago <= 3:  recency_multiplier = 1.00  (full weight — very recent)
+  if months_ago <= 6:  recency_multiplier = 0.95  (slight discount)
+  if months_ago <= 9:  recency_multiplier = 0.85  (moderate discount)
+  if months_ago <= 12: recency_multiplier = 0.70  (heavy discount — only keep if similarity is high)
+
+  total_score = similarity_score * recency_multiplier
+
+TIER 2 GATE: If months_ago > 6, the comp is ONLY kept if similarity_score >= 0.80 (before recency adjustment).
+This ensures older comps must be very close matches to be useful.
+Comps older than 12 months: EXCLUDE entirely.
+
+RECENCY TIERS:
+- Tier 1 (0-6 months): Always include. These are the most relevant comps.
+- Tier 2 (6-12 months): Only include if similarity_score >= 0.80.
+- Beyond 12 months: Exclude entirely.
+
+Tie-breaking: more recent sale date wins, then closer distance wins.
 
 === PRICE ESTIMATION ===
 1. IGNORE the subject property's listing price — it can be misleading
@@ -320,7 +340,7 @@ IMPORTANT: Some property details above are "Unknown". You MUST research the corr
 
   prompt += `
 
-Score each comp using the similarity formula, rank by score, select the top 8, and produce the CompsResult JSON. When MLS data and RentCast data overlap (same address), prefer the MLS close price. Remember to IGNORE the listing price when computing the price estimate.`;
+Score each comp using the similarity formula with recency adjustment, rank by total_score (recency-adjusted), select the top 8, and produce the CompsResult JSON. Apply the Tier 2 gate: exclude comps older than 6 months unless their similarity_score >= 0.80. Exclude comps older than 12 months entirely. When MLS data and RentCast data overlap (same address), prefer the MLS close price. Remember to IGNORE the listing price when computing the price estimate.`;
 
   return prompt;
 }
