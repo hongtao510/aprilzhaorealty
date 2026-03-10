@@ -276,7 +276,11 @@ function buildUserPrompt(opts: {
     simplyRetsListings, simplyRetsError,
   } = opts;
 
-  let prompt = `Perform a CMA for this subject property:
+  const today = new Date().toISOString().split("T")[0];
+
+  let prompt = `Today's date is ${today}. Use this to calculate recency (months_ago) for each comp.
+
+Perform a CMA for this subject property:
 
 Address: ${address}
 Property Type: ${propertyType}
