@@ -30,9 +30,12 @@ function extractJSON(raw: string): unknown {
   const trimmed = raw.trim();
   try { return JSON.parse(trimmed); } catch { /* continue */ }
 
-  // 2. Strip markdown code fences
-  const fenced = trimmed.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "");
-  try { return JSON.parse(fenced); } catch { /* continue */ }
+  // 2. Strip markdown code fences (```json ... ``` or ``` ... ```)
+  const fencePattern = /^`{3,}(?:json)?\s*\n?([\s\S]*?)\n?`{3,}\s*$/i;
+  const fenceMatch = trimmed.match(fencePattern);
+  if (fenceMatch) {
+    try { return JSON.parse(fenceMatch[1].trim()); } catch { /* continue */ }
+  }
 
   // 3. Find the first { and last } — extract the outermost JSON object
   const firstBrace = trimmed.indexOf("{");
@@ -40,6 +43,10 @@ function extractJSON(raw: string): unknown {
   if (firstBrace !== -1 && lastBrace > firstBrace) {
     const candidate = trimmed.slice(firstBrace, lastBrace + 1);
     try { return JSON.parse(candidate); } catch { /* continue */ }
+
+    // 4. Sometimes Claude puts unescaped newlines in string values — try fixing them
+    const fixed = candidate.replace(/(?<=":.*"[^"]*)\n([^"]*")/g, "\\n$1");
+    try { return JSON.parse(fixed); } catch { /* continue */ }
   }
 
   throw new Error("Failed to parse Claude response as JSON — no valid JSON object found");
@@ -570,13 +577,16 @@ export async function POST(
         max_tokens: 8192,
         temperature: 0,
         system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: userPrompt }],
+        messages: [
+          { role: "user", content: userPrompt },
+          { role: "assistant", content: "{" },
+        ],
       });
       const textBlock = message.content.find((b) => b.type === "text");
       if (!textBlock || textBlock.type !== "text") {
         return NextResponse.json({ error: "No text response from Claude" }, { status: 502 });
       }
-      rawResponse = textBlock.text;
+      rawResponse = "{" + textBlock.text;
     } catch (err) {
       return NextResponse.json({ error: err instanceof Error ? err.message : "Claude API call failed" }, { status: 502 });
     }
@@ -661,7 +671,7 @@ export async function POST(
         send("log", { message: `Connecting to Claude API (${model})...` });
 
         const anthropic = new Anthropic();
-        let rawResponse = "";
+        let rawResponse = "{";
 
         send("log", { message: "Streaming response from Claude..." });
 
@@ -670,7 +680,10 @@ export async function POST(
           max_tokens: 8192,
           temperature: 0,
           system: SYSTEM_PROMPT,
-          messages: [{ role: "user", content: userPrompt }],
+          messages: [
+          { role: "user", content: userPrompt },
+          { role: "assistant", content: "{" },
+        ],
         }, { signal: abortController.signal });
 
         let tokenCount = 0;
