@@ -24,6 +24,27 @@ type ValidModel = (typeof VALID_MODELS)[number];
 
 const CACHE_DAYS = 7;
 
+/** Extract JSON object from a Claude response that may contain markdown fences or surrounding text. */
+function extractJSON(raw: string): unknown {
+  // 1. Try parsing the raw string directly
+  const trimmed = raw.trim();
+  try { return JSON.parse(trimmed); } catch { /* continue */ }
+
+  // 2. Strip markdown code fences
+  const fenced = trimmed.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "");
+  try { return JSON.parse(fenced); } catch { /* continue */ }
+
+  // 3. Find the first { and last } — extract the outermost JSON object
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    const candidate = trimmed.slice(firstBrace, lastBrace + 1);
+    try { return JSON.parse(candidate); } catch { /* continue */ }
+  }
+
+  throw new Error("Failed to parse Claude response as JSON — no valid JSON object found");
+}
+
 async function verifyAdmin() {
   const supabase = await createClient();
   const {
@@ -544,8 +565,7 @@ export async function POST(
 
     let compsResult: CompsResult;
     try {
-      const cleaned = rawResponse.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
-      compsResult = JSON.parse(cleaned) as CompsResult;
+      compsResult = extractJSON(rawResponse) as CompsResult;
     } catch {
       return NextResponse.json({ error: "Failed to parse Claude response as JSON", raw: rawResponse }, { status: 502 });
     }
@@ -659,11 +679,12 @@ export async function POST(
 
         let compsResult: CompsResult;
         try {
-          const cleaned = rawResponse.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
-          compsResult = JSON.parse(cleaned) as CompsResult;
-        } catch {
-          send("log", { message: "ERROR: Failed to parse Claude response as JSON" });
-          send("error", { message: "Failed to parse response", raw: rawResponse.slice(0, 500) });
+          compsResult = extractJSON(rawResponse) as CompsResult;
+        } catch (parseErr) {
+          const parseMsg = parseErr instanceof Error ? parseErr.message : "Invalid JSON";
+          send("log", { message: `ERROR: ${parseMsg}` });
+          send("log", { message: `Raw response (first 500 chars): ${rawResponse.slice(0, 500)}` });
+          send("error", { message: parseMsg, raw: rawResponse.slice(0, 500) });
           send("done", {});
           controller.close();
           return;
