@@ -169,6 +169,20 @@ RECENCY TIERS:
 
 Tie-breaking: more recent sale date wins, then closer distance wins.
 
+=== CROSS-CITY PRICE ADJUSTMENT ===
+Comps may come from within 20 miles, including different cities. When a comp is from a DIFFERENT CITY than the subject:
+1. Look up the median $/sqft for both the subject's city and the comp's city (from market stats, your knowledge, or provided data)
+2. Compute: city_factor = subject_city_median_price_per_sqft / comp_city_median_price_per_sqft
+3. Adjust the comp's sold price: adjusted_sold_price = comp_sold_price * city_factor
+4. Use the ADJUSTED price for all downstream calculations (price_per_sqft, weighted average, range)
+5. Note the adjustment in the comp's "reason" field, e.g. "Price adjusted +8% from San Mateo to Burlingame market"
+
+Example: Subject in Burlingame (median $950/sqft), comp in San Mateo (median $850/sqft).
+city_factor = 950/850 = 1.118 → comp's $1.5M becomes $1.677M adjusted.
+
+If median $/sqft data is unavailable for either city, skip the adjustment and note it in the reasoning.
+Comps from the SAME CITY as the subject need no adjustment.
+
 === PRICE ESTIMATION ===
 1. IGNORE the subject property's listing price — it can be misleading
 2. For each comp: price_per_sqft = comp_sold_price / comp_sqft
