@@ -194,8 +194,12 @@ Comps from the SAME CITY as the subject need no adjustment.
 1. IGNORE the subject property's listing price — it can be misleading
 2. For each comp: price_per_sqft = comp_sold_price / comp_sqft
 3. Weighted average: estimated_price_per_sqft = sum(comp_price_per_sqft * comp_score) / sum(comp_scores)
-4. comp_based estimate = estimated_price_per_sqft * subject_sqft
-5. Round estimate to nearest $1,000
+4. comp_only_estimate = estimated_price_per_sqft * subject_sqft
+5. If a RentCast AVM estimate is provided, blend it with the comp estimate:
+   comp_based = 0.70 * comp_only_estimate + 0.30 * rentcast_avm_price
+   This gives 70% weight to comp analysis and 30% weight to the RentCast algorithmic valuation.
+   If no RentCast AVM is available, comp_based = comp_only_estimate.
+6. Round estimate to nearest $1,000
 
 === MARKET TREND ADJUSTMENT ===
 Use the provided market statistics to classify market temperature:
