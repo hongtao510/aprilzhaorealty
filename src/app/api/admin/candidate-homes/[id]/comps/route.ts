@@ -122,7 +122,7 @@ async function fetchSimplyRetsComps(opts: {
 
 const SYSTEM_PROMPT = `You are a real estate Comparative Market Analysis (CMA) expert. You will receive REAL property data from RentCast API — real comparable sales, real property records, and real market statistics. Your job is to ANALYZE this real data and produce a structured CMA report.
 
-Return ONLY valid JSON matching the CompsResult schema — no markdown, no code fences, no explanation.
+CRITICAL: Your entire response must be ONLY the raw JSON object. Start your response with { and end with }. Do NOT wrap in markdown code fences (no \`\`\`). Do NOT include any text before or after the JSON.
 
 === YOUR TASK ===
 1. You will receive the subject property details (from RentCast property records)
@@ -577,16 +577,13 @@ export async function POST(
         max_tokens: 8192,
         temperature: 0,
         system: SYSTEM_PROMPT,
-        messages: [
-          { role: "user", content: userPrompt },
-          { role: "assistant", content: "{" },
-        ],
+        messages: [{ role: "user", content: userPrompt }],
       });
       const textBlock = message.content.find((b) => b.type === "text");
       if (!textBlock || textBlock.type !== "text") {
         return NextResponse.json({ error: "No text response from Claude" }, { status: 502 });
       }
-      rawResponse = "{" + textBlock.text;
+      rawResponse = textBlock.text;
     } catch (err) {
       return NextResponse.json({ error: err instanceof Error ? err.message : "Claude API call failed" }, { status: 502 });
     }
@@ -671,7 +668,7 @@ export async function POST(
         send("log", { message: `Connecting to Claude API (${model})...` });
 
         const anthropic = new Anthropic();
-        let rawResponse = "{";
+        let rawResponse = "";
 
         send("log", { message: "Streaming response from Claude..." });
 
@@ -680,10 +677,7 @@ export async function POST(
           max_tokens: 8192,
           temperature: 0,
           system: SYSTEM_PROMPT,
-          messages: [
-          { role: "user", content: userPrompt },
-          { role: "assistant", content: "{" },
-        ],
+          messages: [{ role: "user", content: userPrompt }],
         }, { signal: abortController.signal });
 
         let tokenCount = 0;
