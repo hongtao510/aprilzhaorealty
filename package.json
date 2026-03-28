@@ -16,9 +16,11 @@
     "next": "16.1.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "puppeteer-core": "^24.40.0",
     "resend": "^6.6.0"
   },
   "devDependencies": {
+    "@sparticuz/chromium": "^143.0.4",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
