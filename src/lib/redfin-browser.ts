@@ -67,7 +67,7 @@ async function getChromiumPath(): Promise<{
     return {
       executablePath: await chromium.executablePath(),
       args: chromium.args,
-      headless: chromium.headless as boolean | "shell",
+      headless: true,
     };
   }
 
