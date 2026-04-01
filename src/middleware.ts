@@ -42,14 +42,22 @@ function isPublicRoute(pathname: string) {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Public routes — pass through but still refresh session
+  // Public routes — pass through without hitting Supabase
   if (isPublicRoute(pathname)) {
-    const { supabaseResponse } = await updateSession(request);
-    return supabaseResponse;
+    return NextResponse.next();
   }
 
-  // Auth-protected routes
-  const { user, supabase, supabaseResponse } = await updateSession(request);
+  // Auth-protected routes — wrap in timeout so Supabase latency never causes 504
+  let user, supabase, supabaseResponse;
+  try {
+    const session = await withTimeout(updateSession(request), 3000);
+    user = session.user;
+    supabase = session.supabase;
+    supabaseResponse = session.supabaseResponse;
+  } catch {
+    // Supabase unreachable — let the request through; pages handle auth client-side
+    return NextResponse.next();
+  }
 
   // Login page — redirect to portal if already logged in
   if (pathname === "/login") {
