@@ -154,6 +154,24 @@ export interface CompHome {
   distance_miles?: number;
 }
 
+/** Raw comp data scraped from Redfin before Claude analysis */
+export interface RawComp {
+  address: string;
+  sold_price: number;
+  sold_date: string;       // YYYY-MM-DD
+  sqft: number;
+  beds: number;
+  baths: number;
+  lot_sqft: number | null; // may not be available from search results
+  redfin_url: string;
+}
+
+/** Result from the scraping pipeline */
+export interface ScrapeResult {
+  comps: RawComp[];
+  source: "redfin-api" | "playwright" | "claude-knowledge";
+}
+
 export interface CompsEstimate {
   weighted_price_per_sqft: number;
   comp_based: number;
