@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getPropertyRecord, getValueEstimate } from "@/lib/rentcast";
 
 async function verifyAdmin() {
   const supabase = await createClient();
@@ -160,42 +159,6 @@ export async function POST(request: NextRequest) {
     // Preview scraping is best-effort
   }
 
-  // Enrich with RentCast property data + valuation (more accurate than OG scraping)
-  const rentcast: {
-    beds?: number; baths?: number; sqft?: number;
-    lotSqft?: number; yearBuilt?: number; propertyType?: string;
-    latitude?: number; longitude?: number;
-    valuation?: number; valuationLow?: number; valuationHigh?: number;
-  } = {};
-
-  if (process.env.RENTCAST_API_KEY && preview.address) {
-    try {
-      const [rcProperty, rcValue] = await Promise.all([
-        getPropertyRecord(preview.address),
-        getValueEstimate(preview.address),
-      ]);
-
-      if (rcProperty) {
-        if (rcProperty.bedrooms) { rentcast.beds = rcProperty.bedrooms; if (!preview.beds) preview.beds = rcProperty.bedrooms; }
-        if (rcProperty.bathrooms) { rentcast.baths = rcProperty.bathrooms; if (!preview.baths) preview.baths = rcProperty.bathrooms; }
-        if (rcProperty.squareFootage) { rentcast.sqft = rcProperty.squareFootage; if (!preview.sqft) preview.sqft = rcProperty.squareFootage; }
-        if (rcProperty.lotSize) rentcast.lotSqft = rcProperty.lotSize;
-        if (rcProperty.yearBuilt) rentcast.yearBuilt = rcProperty.yearBuilt;
-        if (rcProperty.propertyType) rentcast.propertyType = rcProperty.propertyType;
-        if (rcProperty.latitude) rentcast.latitude = rcProperty.latitude;
-        if (rcProperty.longitude) rentcast.longitude = rcProperty.longitude;
-      }
-
-      if (rcValue) {
-        if (rcValue.price) rentcast.valuation = rcValue.price;
-        if (rcValue.priceRangeLow) rentcast.valuationLow = rcValue.priceRangeLow;
-        if (rcValue.priceRangeHigh) rentcast.valuationHigh = rcValue.priceRangeHigh;
-      }
-    } catch {
-      // RentCast enrichment is best-effort
-    }
-  }
-
   // Parse numeric price
   const priceNumeric = preview.price
     ? parseInt(preview.price.replace(/[$,]/g, ""), 10) || null
@@ -213,14 +176,6 @@ export async function POST(request: NextRequest) {
       beds: manualBeds ?? preview.beds,
       baths: manualBaths ?? preview.baths,
       sqft: manualSqft ?? preview.sqft,
-      lot_sqft: rentcast.lotSqft ?? null,
-      year_built: rentcast.yearBuilt ?? null,
-      property_type: rentcast.propertyType ?? null,
-      latitude: rentcast.latitude ?? null,
-      longitude: rentcast.longitude ?? null,
-      valuation: rentcast.valuation ?? null,
-      valuation_low: rentcast.valuationLow ?? null,
-      valuation_high: rentcast.valuationHigh ?? null,
       status: "new",
       source: "manual",
     })
