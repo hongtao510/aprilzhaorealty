@@ -4,8 +4,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { scrapeAllCities, type RedfinListing } from "@/lib/redfin-listings";
 import { escapeHtml } from "@/lib/email-templates";
 
+// Hobby plan max is 60s; scraping 12 cities needs ~30s
+export const maxDuration = 60;
+
 /**
- * POST /api/cron/scrape-listings
+ * GET /api/cron/scrape-listings
  *
  * Daily cron job that scrapes active for-sale listings from Redfin
  * across all 12 featured cities. Upserts into Supabase and marks
@@ -263,7 +266,9 @@ async function sendNewListingsEmail(
 </html>`;
 
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const to = process.env.CONTACT_EMAIL || "aprilcasf@gmail.com";
+  const to = (process.env.CONTACT_EMAIL || "aprilcasf@gmail.com")
+    .split(",")
+    .map((e) => e.trim());
 
   await resend.emails.send({
     from: "April Zhao Realty <onboarding@resend.dev>",
@@ -272,5 +277,5 @@ async function sendNewListingsEmail(
     html,
   });
 
-  log(`Email sent to ${to}: ${totalNew} new listings`);
+  log(`Email sent to ${to.join(", ")}: ${totalNew} new listings`);
 }
