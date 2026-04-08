@@ -278,7 +278,7 @@ async function sendNewListingsEmail(
     .map((e) => e.trim());
 
   await resend.emails.send({
-    from: "April Zhao Realty <onboarding@resend.dev>",
+    from: "April Zhao Realty <noreply@aprilzhaohome.com>",
     to,
     subject: `${totalNew} New Listings — ${today}`,
     html,
