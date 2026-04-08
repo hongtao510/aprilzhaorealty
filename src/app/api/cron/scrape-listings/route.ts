@@ -45,77 +45,84 @@ export async function GET(request: NextRequest) {
   // 2. Scrape all cities
   const cityResults = await scrapeAllCities(log);
 
-  // 3. Upsert each listing into Supabase
+  // 3. Batch upsert listings into Supabase
+  //    Old approach did individual SELECT+INSERT/UPDATE per listing (~1000 queries)
+  //    which caused timeouts. Now we batch everything into a few queries.
   let totalNew = 0;
   let totalUpdated = 0;
   let totalErrors = 0;
 
-  for (const { city, listings } of cityResults) {
-    for (const listing of listings) {
-      try {
-        // Check if this listing already exists (by redfin_url)
-        const { data: existing } = await supabase
-          .from("redfin_listings")
-          .select("id, first_seen_at")
-          .eq("redfin_url", listing.redfin_url)
-          .maybeSingle();
+  // Flatten and deduplicate scraped listings (overlapping city bounding boxes
+  // can return the same listing twice)
+  const seen = new Set<string>();
+  const allListings = cityResults.flatMap(({ listings }) => listings).filter((l) => {
+    if (!l.redfin_url || seen.has(l.redfin_url)) return false;
+    seen.add(l.redfin_url);
+    return true;
+  });
+  const allUrls = allListings.map((l) => l.redfin_url);
 
-        if (existing) {
-          // Update existing listing (price may have changed, days_on_market updates, etc.)
-          await supabase
-            .from("redfin_listings")
-            .update({
-              price: listing.price,
-              beds: listing.beds,
-              baths: listing.baths,
-              sqft: listing.sqft,
-              lot_sqft: listing.lot_sqft,
-              price_per_sqft: listing.price_per_sqft,
-              hoa_per_month: listing.hoa_per_month,
-              days_on_market: listing.days_on_market,
-              status: listing.status,
-              last_seen_at: new Date().toISOString(),
-              is_new: false,
-            })
-            .eq("id", existing.id);
-          totalUpdated++;
-        } else {
-          // Insert new listing
-          await supabase.from("redfin_listings").insert({
-            redfin_url: listing.redfin_url,
-            address: listing.address,
-            city: listing.city,
-            state: listing.state,
-            zip: listing.zip,
-            price: listing.price,
-            beds: listing.beds,
-            baths: listing.baths,
-            sqft: listing.sqft,
-            lot_sqft: listing.lot_sqft,
-            year_built: listing.year_built,
-            price_per_sqft: listing.price_per_sqft,
-            hoa_per_month: listing.hoa_per_month,
-            property_type: listing.property_type,
-            status: listing.status,
-            days_on_market: listing.days_on_market,
-            mls_number: listing.mls_number,
-            latitude: listing.latitude,
-            longitude: listing.longitude,
-            first_seen_at: new Date().toISOString(),
-            last_seen_at: new Date().toISOString(),
-            is_new: true,
-          });
-          totalNew++;
-        }
-      } catch (err) {
-        totalErrors++;
-        if (totalErrors <= 5) {
-          log(`Error upserting ${listing.address}: ${err instanceof Error ? err.message : String(err)}`);
-        }
-      }
+  // Fetch existing URLs in small chunks (large .in() queries exceed PostgREST limits)
+  const existingUrls = new Set<string>();
+  for (let i = 0; i < allUrls.length; i += 50) {
+    const chunk = allUrls.slice(i, i + 50);
+    const { data } = await supabase
+      .from("redfin_listings")
+      .select("redfin_url")
+      .in("redfin_url", chunk);
+    if (data) data.forEach((row) => existingUrls.add(row.redfin_url));
+  }
+
+  log(`Found ${existingUrls.size} existing listings in DB, ${allListings.length} scraped`);
+
+  const now = new Date().toISOString();
+
+  // Build full rows for upsert — all required columns included
+  const rows = allListings
+    .filter((l) => l.redfin_url)
+    .map((listing) => ({
+      redfin_url: listing.redfin_url,
+      address: listing.address,
+      city: listing.city,
+      state: listing.state,
+      zip: listing.zip,
+      price: listing.price,
+      beds: listing.beds,
+      baths: listing.baths,
+      sqft: listing.sqft,
+      lot_sqft: listing.lot_sqft,
+      year_built: listing.year_built,
+      price_per_sqft: listing.price_per_sqft,
+      hoa_per_month: listing.hoa_per_month,
+      property_type: listing.property_type,
+      status: listing.status,
+      days_on_market: listing.days_on_market,
+      mls_number: listing.mls_number,
+      latitude: listing.latitude,
+      longitude: listing.longitude,
+      first_seen_at: now,
+      last_seen_at: now,
+      is_new: !existingUrls.has(listing.redfin_url),
+    }));
+
+  // Batch upsert all listings in chunks of 50
+  for (let i = 0; i < rows.length; i += 50) {
+    const chunk = rows.slice(i, i + 50);
+    const { error } = await supabase
+      .from("redfin_listings")
+      .upsert(chunk, { onConflict: "redfin_url", ignoreDuplicates: false });
+    if (error) {
+      totalErrors += chunk.length;
+      log(`Upsert error (batch ${Math.floor(i / 50)}): ${error.message}`);
+    } else {
+      const newInChunk = chunk.filter((r) => r.is_new).length;
+      totalNew += newInChunk;
+      totalUpdated += chunk.length - newInChunk;
     }
+  }
 
-    log(`${city}: ${listings.length} listings processed`);
+  for (const { city, listings } of cityResults) {
+    log(`${city}: ${listings.length} listings`);
   }
 
   // 4. Mark listings not seen today as potentially off-market
