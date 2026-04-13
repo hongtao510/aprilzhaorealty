@@ -35,20 +35,14 @@ export interface CityConfig {
   east: number;
 }
 
-/** The 12 featured cities with bounding boxes for the Redfin API. */
+/** Featured cities with bounding boxes for the Redfin API (San Mateo to Redwood City). */
 export const FEATURED_CITIES: CityConfig[] = [
-  { name: "San Francisco", south: 37.708, north: 37.812, west: -122.515, east: -122.355 },
-  { name: "Millbrae",      south: 37.588, north: 37.610, west: -122.420, east: -122.380 },
-  { name: "Burlingame",    south: 37.560, north: 37.600, west: -122.395, east: -122.340 },
-  { name: "Hillsborough",  south: 37.540, north: 37.575, west: -122.390, east: -122.335 },
   { name: "San Mateo",     south: 37.530, north: 37.580, west: -122.345, east: -122.280 },
   { name: "Belmont",       south: 37.495, north: 37.535, west: -122.305, east: -122.245 },
   { name: "San Carlos",    south: 37.488, north: 37.520, west: -122.280, east: -122.240 },
   { name: "Foster City",   south: 37.540, north: 37.570, west: -122.280, east: -122.240 },
   { name: "Redwood Shores",south: 37.525, north: 37.545, west: -122.265, east: -122.235 },
   { name: "Redwood City",  south: 37.455, north: 37.510, west: -122.280, east: -122.195 },
-  { name: "Menlo Park",    south: 37.430, north: 37.475, west: -122.210, east: -122.145 },
-  { name: "Palo Alto",     south: 37.380, north: 37.460, west: -122.190, east: -122.110 },
 ];
 
 /**
