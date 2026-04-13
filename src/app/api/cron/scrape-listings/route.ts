@@ -145,7 +145,16 @@ export async function GET(request: NextRequest) {
 
   log(`Done! New: ${totalNew}, Updated: ${totalUpdated}, Errors: ${totalErrors}`);
 
-  // 5. Send daily email with new listings
+  // 5. Fetch photos for new listings (scrape first image from Redfin page)
+  if (totalNew > 0) {
+    try {
+      await fetchPhotosForNewListings(supabase, log);
+    } catch (err) {
+      log(`Photo fetch failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  // 6. Send daily email with new listings
   if (totalNew > 0) {
     try {
       await sendNewListingsEmail(totalNew, log);
@@ -166,6 +175,54 @@ export async function GET(request: NextRequest) {
   };
 
   return NextResponse.json({ success: true, summary, logs });
+}
+
+/**
+ * Scrape the first listing photo from each new listing's Redfin page.
+ */
+async function fetchPhotosForNewListings(
+  supabase: ReturnType<typeof createAdminClient>,
+  log: (msg: string) => void,
+) {
+  const { data: newListings } = await supabase
+    .from("redfin_listings")
+    .select("id, redfin_url")
+    .eq("is_new", true)
+    .is("image_url", null);
+
+  if (!newListings?.length) return;
+  log(`Fetching photos for ${newListings.length} new listings...`);
+
+  let fetched = 0;
+  for (const listing of newListings) {
+    try {
+      const resp = await fetch(listing.redfin_url, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+          Referer: "https://www.redfin.com/",
+        },
+        signal: AbortSignal.timeout(5000),
+      });
+      const html = await resp.text();
+      const match = html.match(
+        /ssl\.cdn-redfin\.com\/photo\/[^"]*?(?:bigphoto|mbpaddedwide)[^"]*?\.(?:jpg|webp)/,
+      );
+      if (match) {
+        const imageUrl = `https://${match[0]}`;
+        await supabase
+          .from("redfin_listings")
+          .update({ image_url: imageUrl })
+          .eq("id", listing.id);
+        fetched++;
+      }
+    } catch {
+      // Skip failures — photo is optional
+    }
+    // Small delay to avoid rate limiting
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  log(`Fetched ${fetched}/${newListings.length} listing photos`);
 }
 
 /**
@@ -206,14 +263,14 @@ async function sendNewListingsEmail(
     day: "numeric",
   });
 
-  // Build HTML email
+  // Build HTML email with listing photos
   let listingsHtml = "";
   for (const [city, listings] of Object.entries(byCity)) {
     listingsHtml += `
       <tr>
-        <td style="padding:20px 20px 8px 20px;">
-          <h2 style="font-size:16px;color:#d4a012;text-transform:uppercase;letter-spacing:2px;margin:0;border-bottom:1px solid #e5e5e5;padding-bottom:8px;">
-            ${escapeHtml(city)} (${listings.length} new)
+        <td style="padding:24px 20px 10px 20px;">
+          <h2 style="font-size:13px;color:#d4a012;text-transform:uppercase;letter-spacing:2px;margin:0;border-bottom:1px solid #e5e5e5;padding-bottom:8px;">
+            ${escapeHtml(city)} &mdash; ${listings.length} new
           </h2>
         </td>
       </tr>`;
@@ -224,19 +281,29 @@ async function sendNewListingsEmail(
         l.beds ? `${l.beds} bd` : null,
         l.baths ? `${l.baths} ba` : null,
         l.sqft ? `${fmt(l.sqft)} sqft` : null,
-        l.lot_sqft ? `${fmt(l.lot_sqft)} sqft lot` : null,
         l.year_built ? `Built ${l.year_built}` : null,
-      ].filter(Boolean).join(" &middot; ");
+      ].filter(Boolean).join(" · ");
+
+      const imageBlock = l.image_url
+        ? `<a href="${escapeHtml(l.redfin_url)}" style="text-decoration:none;">
+             <img src="${escapeHtml(l.image_url)}" alt="${escapeHtml(l.address)}" style="width:100%;height:200px;object-fit:cover;display:block;border-radius:6px 6px 0 0;" />
+           </a>`
+        : `<div style="width:100%;height:120px;background:linear-gradient(135deg,#f0ece0,#e8e0cc);border-radius:6px 6px 0 0;display:flex;align-items:center;justify-content:center;">
+             <span style="font-size:36px;color:#d4a012;">&#8962;</span>
+           </div>`;
 
       listingsHtml += `
       <tr>
         <td style="padding:8px 20px;">
-          <div style="border:1px solid #eee;padding:14px;border-radius:4px;">
-            <a href="${escapeHtml(l.redfin_url)}" style="text-decoration:none;">
-              <p style="font-size:18px;font-weight:bold;color:#1a1a1a;margin:0 0 4px 0;">${escapeHtml(priceStr)}</p>
-              <p style="font-size:14px;color:#333;margin:0 0 4px 0;">${escapeHtml(l.address)}, ${escapeHtml(l.city)}</p>
-              <p style="font-size:12px;color:#888;margin:0;">${details}</p>
-            </a>
+          <div style="border:1px solid #e5e5e5;border-radius:6px;overflow:hidden;">
+            ${imageBlock}
+            <div style="padding:14px 16px;">
+              <a href="${escapeHtml(l.redfin_url)}" style="text-decoration:none;">
+                <p style="font-size:22px;font-weight:bold;color:#1a1a1a;margin:0 0 2px 0;">${escapeHtml(priceStr)}</p>
+                <p style="font-size:14px;color:#333;margin:0 0 6px 0;">${escapeHtml(l.address)}, ${escapeHtml(l.city)} ${escapeHtml(l.zip || "")}</p>
+                <p style="font-size:12px;color:#999;margin:0;">${details}${l.days_on_market != null ? ` · ${l.days_on_market}d on market` : ""}</p>
+              </a>
+            </div>
           </div>
         </td>
       </tr>`;
@@ -246,26 +313,26 @@ async function sendNewListingsEmail(
   const html = `
 <!DOCTYPE html>
 <html>
-<head><meta charset="utf-8" /></head>
-<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:Arial,Helvetica,sans-serif;">
+<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
+<body style="margin:0;padding:0;background-color:#f5f5f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background-color:#ffffff;">
     <tr>
-      <td style="padding:30px 20px;text-align:center;border-bottom:2px solid #d4a012;">
-        <p style="font-size:11px;text-transform:uppercase;letter-spacing:3px;color:#d4a012;margin:0 0 6px 0;">April Zhao Realty</p>
-        <h1 style="font-size:22px;color:#1a1a1a;margin:0;font-weight:normal;">New Listings Today</h1>
-        <p style="font-size:13px;color:#888;margin:8px 0 0 0;">${today}</p>
+      <td style="padding:32px 20px 24px;text-align:center;border-bottom:2px solid #d4a012;">
+        <p style="font-size:11px;text-transform:uppercase;letter-spacing:3px;color:#d4a012;margin:0 0 8px 0;">April Zhao Realty</p>
+        <h1 style="font-size:24px;color:#1a1a1a;margin:0;font-weight:600;">New Listings Today</h1>
+        <p style="font-size:13px;color:#999;margin:8px 0 0 0;">${today}</p>
       </td>
     </tr>
     <tr>
       <td style="padding:20px;text-align:center;background-color:#faf8f0;">
-        <p style="font-size:28px;font-weight:bold;color:#1a1a1a;margin:0;">${totalNew}</p>
-        <p style="font-size:13px;color:#888;margin:4px 0 0 0;">new listings across ${Object.keys(byCity).length} cities</p>
+        <p style="font-size:32px;font-weight:bold;color:#d4a012;margin:0;">${totalNew}</p>
+        <p style="font-size:13px;color:#888;margin:4px 0 0 0;">new listing${totalNew !== 1 ? "s" : ""} across ${Object.keys(byCity).length} cit${Object.keys(byCity).length !== 1 ? "ies" : "y"}</p>
       </td>
     </tr>
     ${listingsHtml}
     <tr>
-      <td style="padding:20px;text-align:center;border-top:1px solid #e5e5e5;">
-        <p style="font-size:11px;color:#999;margin:0;">Scraped from Redfin &middot; Sent via April Zhao Realty</p>
+      <td style="padding:24px 20px;text-align:center;border-top:1px solid #e5e5e5;">
+        <p style="font-size:11px;color:#999;margin:0;">Scraped from Redfin · Sent by April Zhao Realty</p>
       </td>
     </tr>
   </table>

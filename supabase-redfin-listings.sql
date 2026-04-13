@@ -28,6 +28,7 @@ create table if not exists public.redfin_listings (
   first_seen_at timestamptz not null default now(),
   last_seen_at timestamptz not null default now(),
   is_new boolean not null default true,
+  image_url text,
   created_at timestamptz not null default now()
 );
 
