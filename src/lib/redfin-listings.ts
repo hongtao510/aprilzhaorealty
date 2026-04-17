@@ -38,7 +38,7 @@ export interface CityConfig {
 /** Featured cities with bounding boxes for the Redfin API (San Mateo to Redwood City). */
 export const FEATURED_CITIES: CityConfig[] = [
   { name: "San Mateo",     south: 37.530, north: 37.580, west: -122.345, east: -122.280 },
-  { name: "Belmont",       south: 37.495, north: 37.535, west: -122.305, east: -122.245 },
+  { name: "Belmont",       south: 37.495, north: 37.535, west: -122.320, east: -122.245 },
   { name: "San Carlos",    south: 37.488, north: 37.520, west: -122.280, east: -122.240 },
   { name: "Foster City",   south: 37.540, north: 37.570, west: -122.280, east: -122.240 },
   { name: "Redwood Shores",south: 37.525, north: 37.545, west: -122.265, east: -122.235 },
