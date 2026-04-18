@@ -34,8 +34,11 @@ export function AuthProvider({
 }) {
   const [user, setUser] = useState<User | null>(initialUser);
   const [profile, setProfile] = useState<Profile | null>(initialProfile);
-  // If we already have an SSR-resolved user, skip the loading flash
-  const [loading, setLoading] = useState(!initialUser);
+  // SSR already resolved the session (user or null). Start not-loading so
+  // the header renders the correct CTA on first paint instead of flashing
+  // a "···" placeholder for anonymous visitors. Client-side onAuthStateChange
+  // still keeps state fresh on sign-in / sign-out events.
+  const [loading, setLoading] = useState(false);
   const supabase = createClient();
 
   async function fetchProfile(userId: string) {
