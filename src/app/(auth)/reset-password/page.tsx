@@ -15,19 +15,10 @@ export default function ResetPasswordPage() {
   const [recoveryReady, setRecoveryReady] = useState(false);
   const supabase = createClient();
 
-  // Wait for the SDK to process the recovery URL (?code=... or #access_token=...)
-  // and emit either PASSWORD_RECOVERY or a regular session.
+  // Establish the recovery session. With @supabase/ssr the browser client
+  // doesn't always auto-exchange ?code=, so do it explicitly.
   useEffect(() => {
     let mounted = true;
-
-    // Check for an existing session first (covers the case where the SDK
-    // already processed the URL before this component mounted)
-    void (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (mounted && data.session) {
-        setRecoveryReady(true);
-      }
-    })();
 
     const { data: sub } = supabase.auth.onAuthStateChange(
       (event: AuthChangeEvent, session: Session | null) => {
@@ -40,19 +31,52 @@ export default function ResetPasswordPage() {
       }
     );
 
-    // If after 4 seconds we still have no session, surface a hint
-    const timeout = setTimeout(() => {
-      if (mounted && !recoveryReady) {
-        setInfo(
-          "Still waiting for the recovery session... If this stays up, the link may be expired or for a different environment. Request a new reset email."
-        );
+    void (async () => {
+      // Already have a session? (e.g. previously exchanged)
+      const { data: existing } = await supabase.auth.getSession();
+      if (existing.session) {
+        console.log("[reset-password] existing session found");
+        if (mounted) setRecoveryReady(true);
+        return;
       }
-    }, 4000);
+
+      // Try to exchange the ?code=... param for a session
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get("code");
+      if (code) {
+        console.log("[reset-password] exchanging code...");
+        const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
+        if (exchangeErr) {
+          console.error("[reset-password] exchange failed:", exchangeErr);
+          if (mounted) {
+            setError(
+              `Could not validate the reset link: ${exchangeErr.message}. The link may be expired — request a new one.`
+            );
+          }
+          return;
+        }
+        console.log("[reset-password] exchange succeeded");
+        // Strip the code from the URL so a refresh doesn't try to reuse it
+        url.searchParams.delete("code");
+        window.history.replaceState({}, "", url.toString());
+        if (mounted) setRecoveryReady(true);
+        return;
+      }
+
+      // No code, no session — wait for the implicit flow (#access_token=...) just in case
+      const timeout = setTimeout(() => {
+        if (mounted && !recoveryReady) {
+          setInfo(
+            "Still waiting for the recovery session... If this stays up, the link may be expired or for a different environment. Request a new reset email."
+          );
+        }
+      }, 4000);
+      return () => clearTimeout(timeout);
+    })();
 
     return () => {
       mounted = false;
       sub.subscription.unsubscribe();
-      clearTimeout(timeout);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
