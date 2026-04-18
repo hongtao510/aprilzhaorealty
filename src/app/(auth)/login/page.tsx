@@ -58,7 +58,8 @@ function LoginForm() {
     );
 
     if (resetError) {
-      setError("Failed to send reset email. Please try again.");
+      console.error("[login] resetPasswordForEmail error:", resetError);
+      setError(`Failed to send reset email: ${resetError.message}`);
     } else {
       setResetSent(true);
     }
