@@ -23,7 +23,23 @@ export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
-  const { profile } = useAuth();
+  const { user, profile, loading } = useAuth();
+  // If a Supabase session cookie exists, treat the user as logged-in
+  // immediately — avoids flashing "Sign In" between page loads while
+  // AuthProvider awaits the network round-trip.
+  const [hasSessionCookie, setHasSessionCookie] = useState(false);
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    setHasSessionCookie(
+      document.cookie
+        .split(";")
+        .some((c) => {
+          const t = c.trim();
+          return t.startsWith("sb-") && t.includes("-auth-token");
+        })
+    );
+  }, []);
+  const looksLoggedIn = !!user || !!profile || hasSessionCookie;
 
   // Handle scroll effect
   useEffect(() => {
@@ -120,6 +136,17 @@ export function Header() {
               >
                 My Portal
               </Link>
+            ) : looksLoggedIn ? (
+              // Cookie says signed-in but profile hasn't loaded yet — show a
+              // generic Portal CTA so we don't flash Sign In/Up.
+              <Link
+                href="/portal"
+                className="px-6 py-3 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-widest hover:bg-[#b8890f] transition-all duration-300"
+              >
+                My Portal
+              </Link>
+            ) : loading ? (
+              <span className="px-6 py-3 text-xs text-neutral-300">···</span>
             ) : (
               <>
                 <Link
@@ -205,7 +232,7 @@ export function Header() {
             >
               Admin
             </Link>
-          ) : profile ? (
+          ) : profile || looksLoggedIn ? (
             <Link
               href="/portal"
               className="mt-4 px-8 py-3 bg-[#d4a012] text-white text-sm uppercase tracking-widest hover:bg-[#b8890f] transition-all duration-300"
@@ -218,7 +245,7 @@ export function Header() {
             >
               My Portal
             </Link>
-          ) : (
+          ) : loading ? null : (
             <div
               className="mt-4 flex flex-col items-center gap-3"
               style={{
