@@ -4,14 +4,19 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/portal";
+  const nextParam = searchParams.get("next");
 
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      // Get user role to redirect appropriately
+      // Explicit `next` param wins (e.g. /reset-password from a recovery link).
+      // Otherwise fall back to role-based default.
+      if (nextParam) {
+        return NextResponse.redirect(`${origin}${nextParam}`);
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -23,8 +28,7 @@ export async function GET(request: Request) {
           .eq("id", user.id)
           .single();
 
-        const redirectTo =
-          profile?.role === "admin" ? "/admin" : next;
+        const redirectTo = profile?.role === "admin" ? "/admin" : "/portal";
         return NextResponse.redirect(`${origin}${redirectTo}`);
       }
     }
