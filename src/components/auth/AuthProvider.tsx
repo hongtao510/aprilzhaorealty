@@ -106,15 +106,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   async function signOut() {
+    // Race the Supabase call against a 2s timeout so a hung network
+    // never blocks the redirect.
     try {
-      await supabase.auth.signOut();
+      await Promise.race([
+        supabase.auth.signOut(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("signOut timed out")), 2000)
+        ),
+      ]);
     } catch (err) {
-      console.error("supabase.signOut() failed:", err);
+      console.warn("supabase.signOut() failed or timed out:", err);
     }
     setUser(null);
     setProfile(null);
-    // Always hard-nav, even if Supabase threw — clears cookies, server cache, etc.
     if (typeof window !== "undefined") {
+      // Manually clear Supabase auth cookies as a fallback in case the
+      // Supabase call never completed.
+      document.cookie.split(";").forEach((c) => {
+        const name = c.split("=")[0].trim();
+        if (name.startsWith("sb-")) {
+          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+        }
+      });
       window.location.assign("/");
     }
   }
