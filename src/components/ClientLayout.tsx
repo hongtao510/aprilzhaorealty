@@ -106,12 +106,36 @@ export function Header() {
             >
               Contact
             </Link>
-            <Link
-              href="/admin"
-              className="px-6 py-3 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-widest hover:bg-[#b8890f] transition-all duration-300"
-            >
-              Admin
-            </Link>
+            {profile?.role === "admin" ? (
+              <Link
+                href="/admin"
+                className="px-6 py-3 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-widest hover:bg-[#b8890f] transition-all duration-300"
+              >
+                Admin
+              </Link>
+            ) : profile ? (
+              <Link
+                href="/portal"
+                className="px-6 py-3 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-widest hover:bg-[#b8890f] transition-all duration-300"
+              >
+                My Portal
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="text-sm font-medium uppercase tracking-widest text-neutral-600 hover:text-neutral-900 transition-colors"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href="/signup"
+                  className="px-6 py-3 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-widest hover:bg-[#b8890f] transition-all duration-300"
+                >
+                  Sign Up
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -167,19 +191,57 @@ export function Header() {
             ))}
           </nav>
 
-          {/* Admin Link in Mobile Menu */}
-          <Link
-            href="/admin"
-            className="mt-4 px-8 py-3 bg-[#d4a012] text-white text-sm uppercase tracking-widest hover:bg-[#b8890f] transition-all duration-300"
-            style={{
-              transitionDelay: mobileMenuOpen ? `${(navLinks.length + 1) * 100}ms` : "0ms",
-              transform: mobileMenuOpen ? "translateY(0)" : "translateY(20px)",
-              opacity: mobileMenuOpen ? 1 : 0,
-              transition: "all 0.3s ease",
-            }}
-          >
-            Admin
-          </Link>
+          {/* Auth-aware CTA in Mobile Menu */}
+          {profile?.role === "admin" ? (
+            <Link
+              href="/admin"
+              className="mt-4 px-8 py-3 bg-[#d4a012] text-white text-sm uppercase tracking-widest hover:bg-[#b8890f] transition-all duration-300"
+              style={{
+                transitionDelay: mobileMenuOpen ? `${(navLinks.length + 1) * 100}ms` : "0ms",
+                transform: mobileMenuOpen ? "translateY(0)" : "translateY(20px)",
+                opacity: mobileMenuOpen ? 1 : 0,
+                transition: "all 0.3s ease",
+              }}
+            >
+              Admin
+            </Link>
+          ) : profile ? (
+            <Link
+              href="/portal"
+              className="mt-4 px-8 py-3 bg-[#d4a012] text-white text-sm uppercase tracking-widest hover:bg-[#b8890f] transition-all duration-300"
+              style={{
+                transitionDelay: mobileMenuOpen ? `${(navLinks.length + 1) * 100}ms` : "0ms",
+                transform: mobileMenuOpen ? "translateY(0)" : "translateY(20px)",
+                opacity: mobileMenuOpen ? 1 : 0,
+                transition: "all 0.3s ease",
+              }}
+            >
+              My Portal
+            </Link>
+          ) : (
+            <div
+              className="mt-4 flex flex-col items-center gap-3"
+              style={{
+                transitionDelay: mobileMenuOpen ? `${(navLinks.length + 1) * 100}ms` : "0ms",
+                transform: mobileMenuOpen ? "translateY(0)" : "translateY(20px)",
+                opacity: mobileMenuOpen ? 1 : 0,
+                transition: "all 0.3s ease",
+              }}
+            >
+              <Link
+                href="/signup"
+                className="px-8 py-3 bg-[#d4a012] text-white text-sm uppercase tracking-widest hover:bg-[#b8890f] transition-all duration-300"
+              >
+                Sign Up
+              </Link>
+              <Link
+                href="/login"
+                className="text-sm uppercase tracking-widest text-neutral-600 hover:text-neutral-900 transition-colors"
+              >
+                Sign In
+              </Link>
+            </div>
+          )}
 
           {/* Contact Info in Mobile Menu */}
           <div
