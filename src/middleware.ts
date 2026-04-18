@@ -16,6 +16,8 @@ const publicRoutes = [
   "/about",
   "/contact",
   "/testimonials",
+  "/privacy",
+  "/signup",
   "/api/contact",
   "/api/auth",
   "/api/cron",
