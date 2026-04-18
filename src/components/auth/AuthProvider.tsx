@@ -106,12 +106,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   async function signOut() {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error("supabase.signOut() failed:", err);
+    }
     setUser(null);
     setProfile(null);
-    // Hard nav so server components, cached profile data, and cookies all reset
+    // Always hard-nav, even if Supabase threw — clears cookies, server cache, etc.
     if (typeof window !== "undefined") {
-      window.location.href = "/";
+      window.location.assign("/");
     }
   }
 
