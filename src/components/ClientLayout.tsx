@@ -24,22 +24,11 @@ export function Header() {
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
   const { user, profile, loading } = useAuth();
-  // If a Supabase session cookie exists, treat the user as logged-in
-  // immediately — avoids flashing "Sign In" between page loads while
-  // AuthProvider awaits the network round-trip.
-  const [hasSessionCookie, setHasSessionCookie] = useState(false);
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    setHasSessionCookie(
-      document.cookie
-        .split(";")
-        .some((c) => {
-          const t = c.trim();
-          return t.startsWith("sb-") && t.includes("-auth-token");
-        })
-    );
-  }, []);
-  const looksLoggedIn = !!user || !!profile || hasSessionCookie;
+  // SSR hydrates user/profile from RootLayout, so by render time we
+  // already know if someone is signed in. `looksLoggedIn` covers the
+  // edge case where the user object exists but the profile row is
+  // still being fetched.
+  const looksLoggedIn = !!user || !!profile;
 
   // Handle scroll effect
   useEffect(() => {

@@ -4,6 +4,8 @@ import { Analytics } from "@vercel/analytics/next";
 import { AgentStructuredData } from "@/components/StructuredData";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics";
 import { AuthProvider } from "@/components/auth/AuthProvider";
+import { createClient } from "@/lib/supabase/server";
+import type { Profile } from "@/lib/types";
 import "./globals.css";
 
 const inter = Inter({
@@ -91,11 +93,31 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Hydrate AuthProvider with the SSR-resolved session so the header
+  // doesn't flash Sign In/Up while the client SDK awaits getUser().
+  let initialUser = null;
+  let initialProfile: Profile | null = null;
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase.auth.getUser();
+    if (data.user) {
+      initialUser = data.user;
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", data.user.id)
+        .single();
+      initialProfile = (prof as Profile | null) ?? null;
+    }
+  } catch {
+    // Supabase unreachable — fall back to client-side init
+  }
+
   return (
     <html lang="en">
       <head>
@@ -108,7 +130,7 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${playfair.variable} font-sans antialiased min-h-screen flex flex-col bg-white`}
       >
-        <AuthProvider>
+        <AuthProvider initialUser={initialUser} initialProfile={initialProfile}>
           {children}
         </AuthProvider>
         <Analytics />
