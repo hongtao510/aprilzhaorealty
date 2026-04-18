@@ -18,6 +18,7 @@ const publicRoutes = [
   "/testimonials",
   "/privacy",
   "/signup",
+  "/reset-password",
   "/api/contact",
   "/api/auth",
   "/api/cron",

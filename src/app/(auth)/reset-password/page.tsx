@@ -1,22 +1,66 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
-  const router = useRouter();
+  const [recoveryReady, setRecoveryReady] = useState(false);
   const supabase = createClient();
+
+  // Wait for the SDK to process the recovery URL (?code=... or #access_token=...)
+  // and emit either PASSWORD_RECOVERY or a regular session.
+  useEffect(() => {
+    let mounted = true;
+
+    // Check for an existing session first (covers the case where the SDK
+    // already processed the URL before this component mounted)
+    void (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (mounted && data.session) {
+        setRecoveryReady(true);
+      }
+    })();
+
+    const { data: sub } = supabase.auth.onAuthStateChange(
+      (event: AuthChangeEvent, session: Session | null) => {
+        console.log("[reset-password] auth event:", event, !!session);
+        if (!mounted) return;
+        if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && session)) {
+          setRecoveryReady(true);
+          setError(null);
+        }
+      }
+    );
+
+    // If after 4 seconds we still have no session, surface a hint
+    const timeout = setTimeout(() => {
+      if (mounted && !recoveryReady) {
+        setInfo(
+          "Still waiting for the recovery session... If this stays up, the link may be expired or for a different environment. Request a new reset email."
+        );
+      }
+    }, 4000);
+
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setInfo(null);
     if (password.length < 8) {
       setError("Password must be at least 8 characters.");
       return;
@@ -27,31 +71,17 @@ export default function ResetPasswordPage() {
     }
 
     setLoading(true);
-    const { error: updateError } = await supabase.auth.updateUser({ password });
+    const { data, error: updateError } = await supabase.auth.updateUser({ password });
+    console.log("[reset-password] updateUser result:", { data, error: updateError });
+
     if (updateError) {
-      setError(updateError.message);
+      setError(`Could not update password: ${updateError.message}`);
       setLoading(false);
       return;
     }
 
     setDone(true);
     setLoading(false);
-
-    // After 1.5s, route to portal/admin via the existing role-based flow
-    setTimeout(async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push("/login");
-        return;
-      }
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-      router.push(profile?.role === "admin" ? "/admin" : "/portal");
-      router.refresh();
-    }, 1500);
   }
 
   return (
@@ -90,6 +120,11 @@ export default function ResetPasswordPage() {
                 <p className="text-sm">{error}</p>
               </div>
             )}
+            {info && !error && (
+              <div className="mb-6 p-4 bg-amber-50 border border-amber-100 text-amber-800">
+                <p className="text-sm">{info}</p>
+              </div>
+            )}
 
             {done ? (
               <div className="text-center py-8">
@@ -101,9 +136,15 @@ export default function ResetPasswordPage() {
                 <h2 className="font-serif text-2xl text-neutral-900 mb-3">
                   Password Updated
                 </h2>
-                <p className="text-neutral-500 text-sm">
-                  Redirecting you now...
+                <p className="text-neutral-500 text-sm mb-6">
+                  Your password has been changed successfully.
                 </p>
+                <Link
+                  href="/login"
+                  className="inline-block px-12 py-4 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-[0.15em] hover:bg-[#b8890f] transition-all duration-300"
+                >
+                  Sign In
+                </Link>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-6">
@@ -119,7 +160,8 @@ export default function ResetPasswordPage() {
                     required
                     minLength={8}
                     autoFocus
-                    className="w-full px-0 py-3 bg-transparent border-0 border-b-2 border-neutral-200 text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-[#d4a012] transition-colors"
+                    disabled={!recoveryReady}
+                    className="w-full px-0 py-3 bg-transparent border-0 border-b-2 border-neutral-200 text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-[#d4a012] transition-colors disabled:opacity-50"
                     placeholder="At least 8 characters"
                   />
                 </div>
@@ -135,7 +177,8 @@ export default function ResetPasswordPage() {
                     onChange={(e) => setConfirm(e.target.value)}
                     required
                     minLength={8}
-                    className="w-full px-0 py-3 bg-transparent border-0 border-b-2 border-neutral-200 text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-[#d4a012] transition-colors"
+                    disabled={!recoveryReady}
+                    className="w-full px-0 py-3 bg-transparent border-0 border-b-2 border-neutral-200 text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-[#d4a012] transition-colors disabled:opacity-50"
                     placeholder="Re-enter your password"
                   />
                 </div>
@@ -143,12 +186,23 @@ export default function ResetPasswordPage() {
                 <div className="pt-2">
                   <button
                     type="submit"
-                    disabled={loading}
+                    disabled={loading || !recoveryReady}
                     className="w-full px-12 py-4 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-[0.15em] hover:bg-[#b8890f] transition-all duration-300 disabled:opacity-50"
                   >
-                    {loading ? "Updating..." : "Update Password"}
+                    {loading
+                      ? "Updating..."
+                      : !recoveryReady
+                      ? "Verifying reset link..."
+                      : "Update Password"}
                   </button>
                 </div>
+
+                <p className="text-xs text-neutral-400 text-center">
+                  Need a new reset link?{" "}
+                  <Link href="/login" className="text-[#d4a012] underline">
+                    Request one
+                  </Link>
+                </p>
               </form>
             )}
           </div>
