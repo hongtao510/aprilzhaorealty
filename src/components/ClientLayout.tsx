@@ -23,7 +23,12 @@ export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
-  const { profile } = useAuth();
+  const { user, profile, loading } = useAuth();
+  // SSR hydrates user/profile from RootLayout, so by render time we
+  // already know if someone is signed in. `looksLoggedIn` covers the
+  // edge case where the user object exists but the profile row is
+  // still being fetched.
+  const looksLoggedIn = !!user || !!profile;
 
   // Handle scroll effect
   useEffect(() => {
@@ -106,12 +111,47 @@ export function Header() {
             >
               Contact
             </Link>
-            <Link
-              href="/admin"
-              className="px-6 py-3 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-widest hover:bg-[#b8890f] transition-all duration-300"
-            >
-              Admin
-            </Link>
+            {profile?.role === "admin" ? (
+              <Link
+                href="/admin"
+                className="px-6 py-3 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-widest hover:bg-[#b8890f] transition-all duration-300"
+              >
+                Admin
+              </Link>
+            ) : profile ? (
+              <Link
+                href="/portal"
+                className="px-6 py-3 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-widest hover:bg-[#b8890f] transition-all duration-300"
+              >
+                My Portal
+              </Link>
+            ) : looksLoggedIn ? (
+              // Cookie says signed-in but profile hasn't loaded yet — show a
+              // generic Portal CTA so we don't flash Sign In/Up.
+              <Link
+                href="/portal"
+                className="px-6 py-3 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-widest hover:bg-[#b8890f] transition-all duration-300"
+              >
+                My Portal
+              </Link>
+            ) : loading ? (
+              <span className="px-6 py-3 text-xs text-neutral-300">···</span>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="text-sm font-medium uppercase tracking-widest text-neutral-600 hover:text-neutral-900 transition-colors"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href="/signup"
+                  className="px-6 py-3 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-widest hover:bg-[#b8890f] transition-all duration-300"
+                >
+                  Sign Up
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -167,19 +207,57 @@ export function Header() {
             ))}
           </nav>
 
-          {/* Admin Link in Mobile Menu */}
-          <Link
-            href="/admin"
-            className="mt-4 px-8 py-3 bg-[#d4a012] text-white text-sm uppercase tracking-widest hover:bg-[#b8890f] transition-all duration-300"
-            style={{
-              transitionDelay: mobileMenuOpen ? `${(navLinks.length + 1) * 100}ms` : "0ms",
-              transform: mobileMenuOpen ? "translateY(0)" : "translateY(20px)",
-              opacity: mobileMenuOpen ? 1 : 0,
-              transition: "all 0.3s ease",
-            }}
-          >
-            Admin
-          </Link>
+          {/* Auth-aware CTA in Mobile Menu */}
+          {profile?.role === "admin" ? (
+            <Link
+              href="/admin"
+              className="mt-4 px-8 py-3 bg-[#d4a012] text-white text-sm uppercase tracking-widest hover:bg-[#b8890f] transition-all duration-300"
+              style={{
+                transitionDelay: mobileMenuOpen ? `${(navLinks.length + 1) * 100}ms` : "0ms",
+                transform: mobileMenuOpen ? "translateY(0)" : "translateY(20px)",
+                opacity: mobileMenuOpen ? 1 : 0,
+                transition: "all 0.3s ease",
+              }}
+            >
+              Admin
+            </Link>
+          ) : profile || looksLoggedIn ? (
+            <Link
+              href="/portal"
+              className="mt-4 px-8 py-3 bg-[#d4a012] text-white text-sm uppercase tracking-widest hover:bg-[#b8890f] transition-all duration-300"
+              style={{
+                transitionDelay: mobileMenuOpen ? `${(navLinks.length + 1) * 100}ms` : "0ms",
+                transform: mobileMenuOpen ? "translateY(0)" : "translateY(20px)",
+                opacity: mobileMenuOpen ? 1 : 0,
+                transition: "all 0.3s ease",
+              }}
+            >
+              My Portal
+            </Link>
+          ) : loading ? null : (
+            <div
+              className="mt-4 flex flex-col items-center gap-3"
+              style={{
+                transitionDelay: mobileMenuOpen ? `${(navLinks.length + 1) * 100}ms` : "0ms",
+                transform: mobileMenuOpen ? "translateY(0)" : "translateY(20px)",
+                opacity: mobileMenuOpen ? 1 : 0,
+                transition: "all 0.3s ease",
+              }}
+            >
+              <Link
+                href="/signup"
+                className="px-8 py-3 bg-[#d4a012] text-white text-sm uppercase tracking-widest hover:bg-[#b8890f] transition-all duration-300"
+              >
+                Sign Up
+              </Link>
+              <Link
+                href="/login"
+                className="text-sm uppercase tracking-widest text-neutral-600 hover:text-neutral-900 transition-colors"
+              >
+                Sign In
+              </Link>
+            </div>
+          )}
 
           {/* Contact Info in Mobile Menu */}
           <div
@@ -207,35 +285,6 @@ export function Header() {
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
-  const [nlName, setNlName] = useState("");
-  const [nlEmail, setNlEmail] = useState("");
-  const [nlStatus, setNlStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [nlMessage, setNlMessage] = useState("");
-
-  const handleNewsletterSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setNlStatus("loading");
-    try {
-      const res = await fetch("/api/newsletter", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: nlName, email: nlEmail }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setNlStatus("error");
-        setNlMessage(data.error || "Something went wrong.");
-        return;
-      }
-      setNlStatus("success");
-      setNlMessage("Thank you for subscribing!");
-      setNlName("");
-      setNlEmail("");
-    } catch {
-      setNlStatus("error");
-      setNlMessage("Unable to subscribe. Please try again.");
-    }
-  };
 
   return (
     <footer className="bg-[#eae6e1] text-neutral-900 mt-auto border-t border-neutral-200">
@@ -327,47 +376,29 @@ export function Footer() {
         </div>
       </div>
 
-      {/* Newsletter Signup */}
+      {/* Newsletter Signup CTA */}
       <div className="border-t border-neutral-200">
         <div className="max-w-7xl mx-auto px-6 lg:px-8 py-10">
           <div className="flex flex-col md:flex-row md:items-center gap-6">
             <div className="md:w-1/3">
               <h4 className={`${playfair.className} text-xl font-normal text-neutral-900 mb-1`}>Stay Updated</h4>
-              <p className="text-neutral-500 text-sm">Market insights and new listings, delivered to your inbox.</p>
+              <p className="text-neutral-500 text-sm">
+                Create an account to receive daily Bay Area listings in the cities you choose.
+              </p>
             </div>
-            <div className="md:flex-1">
-              {nlStatus === "success" ? (
-                <p className="text-sm text-[#d4a012] font-medium">{nlMessage}</p>
-              ) : (
-                <form onSubmit={handleNewsletterSubmit} className="flex flex-col sm:flex-row gap-3">
-                  <input
-                    type="text"
-                    placeholder="Name"
-                    value={nlName}
-                    onChange={(e) => setNlName(e.target.value)}
-                    required
-                    className="px-4 py-3 bg-white border border-neutral-300 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-[#d4a012] transition-colors flex-1"
-                  />
-                  <input
-                    type="email"
-                    placeholder="Email"
-                    value={nlEmail}
-                    onChange={(e) => setNlEmail(e.target.value)}
-                    required
-                    className="px-4 py-3 bg-white border border-neutral-300 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-[#d4a012] transition-colors flex-1"
-                  />
-                  <button
-                    type="submit"
-                    disabled={nlStatus === "loading"}
-                    className="px-8 py-3 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-widest hover:bg-[#b8890f] transition-colors disabled:opacity-50 whitespace-nowrap"
-                  >
-                    {nlStatus === "loading" ? "Subscribing..." : "Subscribe"}
-                  </button>
-                </form>
-              )}
-              {nlStatus === "error" && (
-                <p className="text-sm text-red-600 mt-2">{nlMessage}</p>
-              )}
+            <div className="md:flex-1 flex flex-col sm:flex-row gap-3 sm:items-center">
+              <Link
+                href="/signup"
+                className="inline-block px-8 py-3 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-widest hover:bg-[#b8890f] transition-colors whitespace-nowrap text-center"
+              >
+                Create Account
+              </Link>
+              <Link
+                href="/login"
+                className="text-neutral-500 hover:text-[#d4a012] text-sm uppercase tracking-wider text-center"
+              >
+                Already a member? Sign in
+              </Link>
             </div>
           </div>
         </div>

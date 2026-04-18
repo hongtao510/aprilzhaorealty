@@ -54,11 +54,12 @@ function LoginForm() {
 
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(
       email,
-      { redirectTo: `${window.location.origin}/api/auth/callback?next=/portal` }
+      { redirectTo: `${window.location.origin}/reset-password` }
     );
 
     if (resetError) {
-      setError("Failed to send reset email. Please try again.");
+      console.error("[login] resetPasswordForEmail error:", resetError);
+      setError(`Failed to send reset email: ${resetError.message}`);
     } else {
       setResetSent(true);
     }
@@ -238,6 +239,15 @@ function LoginForm() {
                   </button>
                 </div>
               </form>
+            )}
+
+            {!showReset && !resetSent && (
+              <p className="text-sm text-neutral-500 text-center mt-8">
+                New here?{" "}
+                <Link href="/signup" className="text-[#d4a012] hover:text-[#b8890f] transition-colors">
+                  Create an account
+                </Link>
+              </p>
             )}
           </div>
 

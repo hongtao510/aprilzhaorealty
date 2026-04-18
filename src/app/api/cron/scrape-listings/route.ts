@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { scrapeAllCities, type RedfinListing } from "@/lib/redfin-listings";
-import { escapeHtml } from "@/lib/email-templates";
+import { buildSubscriberDigestHtml, type DigestListing, escapeHtml } from "@/lib/email-templates";
 
 // Hobby plan max is 60s; scraping 12 cities needs ~30s
 export const maxDuration = 60;
@@ -164,6 +164,15 @@ export async function GET(request: NextRequest) {
     }
   } else {
     log("No new listings today — skipping email");
+  }
+
+  // 7. Fan out personalized digests to subscribed users
+  if (totalNew > 0) {
+    try {
+      await sendSubscriberDigests(log);
+    } catch (err) {
+      log(`Subscriber fan-out failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   const summary = {
@@ -352,4 +361,90 @@ async function sendNewListingsEmail(
   });
 
   log(`Email sent to ${to.join(", ")}: ${totalNew} new listings`);
+}
+
+/**
+ * Fan out a personalized, city-filtered digest to every user who has at least
+ * one entry in profiles.newsletter_cities. One email per user via Resend batch.
+ */
+async function sendSubscriberDigests(log: (msg: string) => void) {
+  const supabase = createAdminClient();
+
+  const { data: subscribers, error: subErr } = await supabase
+    .from("profiles")
+    .select("id, email, full_name, newsletter_cities, unsubscribe_token")
+    .eq("newsletter_approved", true)
+    .neq("newsletter_cities", "{}");
+
+  if (subErr) {
+    log(`Failed to fetch subscribers: ${subErr.message}`);
+    return;
+  }
+  if (!subscribers?.length) {
+    log("No approved subscribers to email");
+    return;
+  }
+
+  const { data: newListings, error: listErr } = await supabase
+    .from("redfin_listings")
+    .select("redfin_url, address, city, zip, price, beds, baths, sqft, year_built, days_on_market, image_url")
+    .eq("is_new", true);
+
+  if (listErr || !newListings?.length) {
+    log("No new listings to fan out");
+    return;
+  }
+
+  const byCity: Record<string, DigestListing[]> = {};
+  for (const l of newListings as DigestListing[]) {
+    (byCity[l.city] ??= []).push(l);
+  }
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://aprilzhaohome.com";
+  const resend = new Resend(process.env.RESEND_API_KEY);
+
+  type BatchItem = {
+    from: string;
+    to: string[];
+    subject: string;
+    html: string;
+    headers: Record<string, string>;
+  };
+
+  const batch: BatchItem[] = [];
+  for (const user of subscribers) {
+    const cities = (user.newsletter_cities ?? []) as string[];
+    const userListings = cities.flatMap((c) => byCity[c] ?? []);
+    if (userListings.length === 0) continue;
+
+    const unsubscribeUrl = `${siteUrl}/api/newsletter/unsubscribe?token=${encodeURIComponent(user.unsubscribe_token)}`;
+    batch.push({
+      from: "April Zhao Realty <noreply@aprilzhaohome.com>",
+      to: [user.email],
+      subject: `${userListings.length} new listing${userListings.length !== 1 ? "s" : ""} in your cities`,
+      html: buildSubscriberDigestHtml(
+        { email: user.email, full_name: user.full_name, unsubscribe_token: user.unsubscribe_token },
+        userListings,
+        siteUrl,
+      ),
+      headers: {
+        "List-Unsubscribe": `<${unsubscribeUrl}>`,
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      },
+    });
+  }
+
+  log(`Fanning out to ${batch.length} subscriber${batch.length !== 1 ? "s" : ""}...`);
+
+  // Resend batch API accepts up to 100 emails per call
+  for (let i = 0; i < batch.length; i += 100) {
+    const chunk = batch.slice(i, i + 100);
+    try {
+      await resend.batch.send(chunk);
+    } catch (err) {
+      log(`Batch send failed (${i}): ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  log(`Sent ${batch.length} subscriber digest${batch.length !== 1 ? "s" : ""}`);
 }

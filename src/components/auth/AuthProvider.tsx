@@ -23,10 +23,19 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+export function AuthProvider({
+  children,
+  initialUser = null,
+  initialProfile = null,
+}: {
+  children: React.ReactNode;
+  initialUser?: User | null;
+  initialProfile?: Profile | null;
+}) {
+  const [user, setUser] = useState<User | null>(initialUser);
+  const [profile, setProfile] = useState<Profile | null>(initialProfile);
+  // If we already have an SSR-resolved user, skip the loading flash
+  const [loading, setLoading] = useState(!initialUser);
   const supabase = createClient();
 
   async function fetchProfile(userId: string) {
@@ -106,9 +115,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   async function signOut() {
-    await supabase.auth.signOut();
+    // Race the Supabase call against a 2s timeout so a hung network
+    // never blocks the redirect.
+    try {
+      await Promise.race([
+        supabase.auth.signOut(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("signOut timed out")), 2000)
+        ),
+      ]);
+    } catch (err) {
+      console.warn("supabase.signOut() failed or timed out:", err);
+    }
     setUser(null);
     setProfile(null);
+    if (typeof window !== "undefined") {
+      // Manually clear Supabase auth cookies as a fallback in case the
+      // Supabase call never completed.
+      document.cookie.split(";").forEach((c) => {
+        const name = c.split("=")[0].trim();
+        if (name.startsWith("sb-")) {
+          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+        }
+      });
+      window.location.assign("/");
+    }
   }
 
   return (
