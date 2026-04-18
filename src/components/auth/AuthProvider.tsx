@@ -109,6 +109,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
+    // Hard nav so server components, cached profile data, and cookies all reset
+    if (typeof window !== "undefined") {
+      window.location.href = "/";
+    }
   }
 
   return (
