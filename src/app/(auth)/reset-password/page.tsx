@@ -95,17 +95,30 @@ export default function ResetPasswordPage() {
     }
 
     setLoading(true);
-    const { data, error: updateError } = await supabase.auth.updateUser({ password });
-    console.log("[reset-password] updateUser result:", { data, error: updateError });
+    try {
+      const result = await Promise.race([
+        supabase.auth.updateUser({ password }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Request timed out after 8s")), 8000)
+        ),
+      ]);
+      console.log("[reset-password] updateUser result:", result);
 
-    if (updateError) {
-      setError(`Could not update password: ${updateError.message}`);
+      if (result.error) {
+        setError(`Could not update password: ${result.error.message}`);
+        setLoading(false);
+        return;
+      }
+      setDone(true);
       setLoading(false);
-      return;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[reset-password] updateUser threw:", err);
+      setError(
+        `Password update failed: ${msg}. Try again, or refresh and request a new reset email.`
+      );
+      setLoading(false);
     }
-
-    setDone(true);
-    setLoading(false);
   }
 
   return (
