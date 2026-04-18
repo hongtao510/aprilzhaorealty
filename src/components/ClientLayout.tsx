@@ -207,35 +207,6 @@ export function Header() {
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
-  const [nlName, setNlName] = useState("");
-  const [nlEmail, setNlEmail] = useState("");
-  const [nlStatus, setNlStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [nlMessage, setNlMessage] = useState("");
-
-  const handleNewsletterSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setNlStatus("loading");
-    try {
-      const res = await fetch("/api/newsletter", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: nlName, email: nlEmail }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setNlStatus("error");
-        setNlMessage(data.error || "Something went wrong.");
-        return;
-      }
-      setNlStatus("success");
-      setNlMessage("Thank you for subscribing!");
-      setNlName("");
-      setNlEmail("");
-    } catch {
-      setNlStatus("error");
-      setNlMessage("Unable to subscribe. Please try again.");
-    }
-  };
 
   return (
     <footer className="bg-[#eae6e1] text-neutral-900 mt-auto border-t border-neutral-200">
@@ -327,47 +298,29 @@ export function Footer() {
         </div>
       </div>
 
-      {/* Newsletter Signup */}
+      {/* Newsletter Signup CTA */}
       <div className="border-t border-neutral-200">
         <div className="max-w-7xl mx-auto px-6 lg:px-8 py-10">
           <div className="flex flex-col md:flex-row md:items-center gap-6">
             <div className="md:w-1/3">
               <h4 className={`${playfair.className} text-xl font-normal text-neutral-900 mb-1`}>Stay Updated</h4>
-              <p className="text-neutral-500 text-sm">Market insights and new listings, delivered to your inbox.</p>
+              <p className="text-neutral-500 text-sm">
+                Create an account to receive daily Bay Area listings in the cities you choose.
+              </p>
             </div>
-            <div className="md:flex-1">
-              {nlStatus === "success" ? (
-                <p className="text-sm text-[#d4a012] font-medium">{nlMessage}</p>
-              ) : (
-                <form onSubmit={handleNewsletterSubmit} className="flex flex-col sm:flex-row gap-3">
-                  <input
-                    type="text"
-                    placeholder="Name"
-                    value={nlName}
-                    onChange={(e) => setNlName(e.target.value)}
-                    required
-                    className="px-4 py-3 bg-white border border-neutral-300 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-[#d4a012] transition-colors flex-1"
-                  />
-                  <input
-                    type="email"
-                    placeholder="Email"
-                    value={nlEmail}
-                    onChange={(e) => setNlEmail(e.target.value)}
-                    required
-                    className="px-4 py-3 bg-white border border-neutral-300 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-[#d4a012] transition-colors flex-1"
-                  />
-                  <button
-                    type="submit"
-                    disabled={nlStatus === "loading"}
-                    className="px-8 py-3 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-widest hover:bg-[#b8890f] transition-colors disabled:opacity-50 whitespace-nowrap"
-                  >
-                    {nlStatus === "loading" ? "Subscribing..." : "Subscribe"}
-                  </button>
-                </form>
-              )}
-              {nlStatus === "error" && (
-                <p className="text-sm text-red-600 mt-2">{nlMessage}</p>
-              )}
+            <div className="md:flex-1 flex flex-col sm:flex-row gap-3 sm:items-center">
+              <Link
+                href="/signup"
+                className="inline-block px-8 py-3 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-widest hover:bg-[#b8890f] transition-colors whitespace-nowrap text-center"
+              >
+                Create Account
+              </Link>
+              <Link
+                href="/login"
+                className="text-neutral-500 hover:text-[#d4a012] text-sm uppercase tracking-wider text-center"
+              >
+                Already a member? Sign in
+              </Link>
             </div>
           </div>
         </div>
