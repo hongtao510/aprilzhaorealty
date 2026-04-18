@@ -373,6 +373,7 @@ async function sendSubscriberDigests(log: (msg: string) => void) {
   const { data: subscribers, error: subErr } = await supabase
     .from("profiles")
     .select("id, email, full_name, newsletter_cities, unsubscribe_token")
+    .eq("newsletter_approved", true)
     .neq("newsletter_cities", "{}");
 
   if (subErr) {
@@ -380,7 +381,7 @@ async function sendSubscriberDigests(log: (msg: string) => void) {
     return;
   }
   if (!subscribers?.length) {
-    log("No subscribers to email");
+    log("No approved subscribers to email");
     return;
   }
 
