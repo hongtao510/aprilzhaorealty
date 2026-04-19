@@ -10,6 +10,7 @@ export interface UserRow {
   role: string;
   newsletter_cities: string[];
   newsletter_approved: boolean;
+  is_concierge: boolean;
   created_at: string;
   last_sign_in_at: string | null;
 }
@@ -106,11 +107,18 @@ export function UsersTable({ rows: initialRows }: { rows: UserRow[] }) {
                         {r.full_name || "—"}
                       </span>
                       <span className="text-neutral-500 text-xs">{r.email}</span>
-                      {r.role === "admin" && (
-                        <span className="mt-1 inline-block w-fit px-2 py-0.5 bg-[#d4a012] text-white text-[10px] uppercase tracking-wider">
-                          Admin
-                        </span>
-                      )}
+                      <div className="flex gap-1 mt-1 flex-wrap">
+                        {r.role === "admin" && (
+                          <span className="inline-block w-fit px-2 py-0.5 bg-[#d4a012] text-white text-[10px] uppercase tracking-wider">
+                            Admin
+                          </span>
+                        )}
+                        {r.is_concierge && (
+                          <span className="inline-block w-fit px-2 py-0.5 bg-blue-100 text-blue-800 text-[10px] uppercase tracking-wider">
+                            Client
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="px-4 py-3 align-top text-neutral-600">{r.phone || "—"}</td>

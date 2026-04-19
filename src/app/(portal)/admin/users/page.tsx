@@ -33,6 +33,16 @@ export default async function AdminUsersPage() {
     lastSignInById.set(u.id, u.last_sign_in_at ?? null);
   }
 
+  // Concierge signal: any materials or messages tied to this profile
+  // means April is actively working with them as a client.
+  const [{ data: materials }, { data: messages }] = await Promise.all([
+    admin.from("materials").select("client_id"),
+    admin.from("messages").select("client_id"),
+  ]);
+  const conciergeIds = new Set<string>();
+  for (const m of materials ?? []) if (m.client_id) conciergeIds.add(m.client_id);
+  for (const m of messages ?? []) if (m.client_id) conciergeIds.add(m.client_id);
+
   const rawRows: UserRow[] = (profiles ?? []).map((p) => ({
     id: p.id,
     email: p.email,
@@ -41,6 +51,7 @@ export default async function AdminUsersPage() {
     role: p.role,
     newsletter_cities: (p.newsletter_cities ?? []) as string[],
     newsletter_approved: !!p.newsletter_approved,
+    is_concierge: conciergeIds.has(p.id),
     created_at: p.created_at,
     last_sign_in_at: lastSignInById.get(p.id) ?? null,
   }));
