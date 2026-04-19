@@ -89,10 +89,16 @@ function sortListings(rows: ListingRow[], key: SortKey): ListingRow[] {
       break;
     case "newest":
     default:
+      // Sort by Redfin's days-on-market (smaller = more recently listed).
+      // Listings with a null count fall to the bottom. Tie-break on our
+      // own first_seen_at so listings we just picked up lead the rest.
       cp.sort((a, b) => {
-        const av = a.first_seen_at ?? "";
-        const bv = b.first_seen_at ?? "";
-        return bv.localeCompare(av);
+        const ad = a.days_on_market ?? Number.POSITIVE_INFINITY;
+        const bd = b.days_on_market ?? Number.POSITIVE_INFINITY;
+        if (ad !== bd) return ad - bd;
+        const af = a.first_seen_at ?? "";
+        const bf = b.first_seen_at ?? "";
+        return bf.localeCompare(af);
       });
   }
   return cp;
