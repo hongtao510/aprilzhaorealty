@@ -16,7 +16,7 @@ export default async function PortalPage() {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "full_name, email, newsletter_cities, filter_property_types, filter_min_price, filter_max_price, filter_min_beds, filter_min_baths, filter_min_sqft, filter_max_sqft"
+      "full_name, email, newsletter_cities, filter_property_types, filter_price_ranges, filter_sqft_ranges, filter_min_beds, filter_min_baths"
     )
     .eq("id", user.id)
     .single();
@@ -53,12 +53,10 @@ export default async function PortalPage() {
           initialSelected={selected}
           initialFilters={{
             property_types: (profile?.filter_property_types ?? []) as string[],
-            min_price: profile?.filter_min_price ?? null,
-            max_price: profile?.filter_max_price ?? null,
+            price_ranges: (profile?.filter_price_ranges ?? []) as string[],
+            sqft_ranges: (profile?.filter_sqft_ranges ?? []) as string[],
             min_beds: profile?.filter_min_beds ?? null,
             min_baths: profile?.filter_min_baths ?? null,
-            min_sqft: profile?.filter_min_sqft ?? null,
-            max_sqft: profile?.filter_max_sqft ?? null,
           }}
         />
       </section>

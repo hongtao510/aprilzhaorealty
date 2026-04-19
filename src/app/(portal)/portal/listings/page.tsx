@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import {
+  PRICE_RANGE_BUCKETS,
+  SQFT_RANGE_BUCKETS,
+  valueInAnyRange,
+} from "@/lib/filter-ranges";
 
 interface ListingRow {
   id: string;
@@ -32,21 +37,21 @@ export default async function PortalListingsPage() {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "newsletter_cities, filter_property_types, filter_min_price, filter_max_price, filter_min_beds, filter_min_baths, filter_min_sqft, filter_max_sqft"
+      "newsletter_cities, filter_property_types, filter_price_ranges, filter_sqft_ranges, filter_min_beds, filter_min_baths"
     )
     .eq("id", user.id)
     .single();
 
   const cities = (profile?.newsletter_cities ?? []) as string[];
   const propTypes = (profile?.filter_property_types ?? []) as string[];
-  const minPrice = profile?.filter_min_price ?? null;
-  const maxPrice = profile?.filter_max_price ?? null;
+  const priceRanges = (profile?.filter_price_ranges ?? []) as string[];
+  const sqftRanges = (profile?.filter_sqft_ranges ?? []) as string[];
   const minBeds = profile?.filter_min_beds ?? null;
   const minBaths = profile?.filter_min_baths ?? null;
-  const minSqft = profile?.filter_min_sqft ?? null;
-  const maxSqft = profile?.filter_max_sqft ?? null;
 
-  let listings: ListingRow[] = [];
+  // Query applies city/type/bed/bath at the DB; price + sqft ranges
+  // (multi-select unions) are filtered in memory since PostgREST can't
+  // express "falls into ANY of these disjoint ranges" cleanly.
   let query = supabase
     .from("redfin_listings")
     .select(
@@ -56,17 +61,21 @@ export default async function PortalListingsPage() {
 
   if (cities.length > 0) query = query.in("city", cities);
   if (propTypes.length > 0) query = query.in("property_type", propTypes);
-  if (minPrice != null) query = query.gte("price", minPrice);
-  if (maxPrice != null) query = query.lte("price", maxPrice);
   if (minBeds != null) query = query.gte("beds", minBeds);
   if (minBaths != null) query = query.gte("baths", minBaths);
-  if (minSqft != null) query = query.gte("sqft", minSqft);
-  if (maxSqft != null) query = query.lte("sqft", maxSqft);
 
   const { data } = await query
     .order("first_seen_at", { ascending: false })
-    .limit(60);
-  listings = (data ?? []) as ListingRow[];
+    .limit(300); // over-fetch; we trim after in-memory range filter below
+
+  const prelim = (data ?? []) as ListingRow[];
+  const listings = prelim
+    .filter(
+      (l) =>
+        valueInAnyRange(l.price, priceRanges, PRICE_RANGE_BUCKETS) &&
+        valueInAnyRange(l.sqft, sqftRanges, SQFT_RANGE_BUCKETS)
+    )
+    .slice(0, 60);
 
   const noCities = cities.length === 0;
 

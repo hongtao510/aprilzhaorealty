@@ -4,12 +4,10 @@ import { useState } from "react";
 
 export interface ListingFilters {
   property_types: string[];
-  min_price: number | null;
-  max_price: number | null;
+  price_ranges: string[];
+  sqft_ranges: string[];
   min_beds: number | null;
   min_baths: number | null;
-  min_sqft: number | null;
-  max_sqft: number | null;
 }
 
 interface Props {
@@ -24,32 +22,69 @@ const PROPERTY_TYPE_OPTIONS = [
   { value: "Townhouse", label: "Townhouse" },
 ];
 
-// Dropdown options — values in raw numbers, labels in friendly format.
-// Empty-string value = "Any" (null on save).
-const PRICE_OPTIONS = [
-  500_000, 750_000, 1_000_000, 1_250_000, 1_500_000, 1_750_000,
-  2_000_000, 2_250_000, 2_500_000, 3_000_000, 3_500_000, 4_000_000,
-  5_000_000, 7_500_000, 10_000_000,
+// Price buckets. `key` is the stable identifier stored in the DB.
+export const PRICE_RANGES = [
+  { key: "0-1m", label: "Under $1M" },
+  { key: "1m-1.5m", label: "$1M – $1.5M" },
+  { key: "1.5m-2m", label: "$1.5M – $2M" },
+  { key: "2m-2.5m", label: "$2M – $2.5M" },
+  { key: "2.5m-3m", label: "$2.5M – $3M" },
+  { key: "3m-4m", label: "$3M – $4M" },
+  { key: "4m-5m", label: "$4M – $5M" },
+  { key: "5m+", label: "$5M+" },
 ];
 
-function priceLabel(n: number): string {
-  if (n >= 1_000_000) {
-    const m = n / 1_000_000;
-    return `$${m % 1 === 0 ? m.toFixed(0) : m.toFixed(2).replace(/\.?0+$/, "")}M`;
-  }
-  return `$${(n / 1000).toFixed(0)}k`;
-}
+// Sqft buckets.
+export const SQFT_RANGES = [
+  { key: "0-1000", label: "Under 1,000" },
+  { key: "1000-1500", label: "1,000 – 1,500" },
+  { key: "1500-2000", label: "1,500 – 2,000" },
+  { key: "2000-2500", label: "2,000 – 2,500" },
+  { key: "2500-3000", label: "2,500 – 3,000" },
+  { key: "3000-4000", label: "3,000 – 4,000" },
+  { key: "4000+", label: "4,000+" },
+];
 
 const BED_OPTIONS = [1, 2, 3, 4, 5, 6];
 const BATH_OPTIONS = [1, 1.5, 2, 2.5, 3, 3.5, 4, 5];
-const SQFT_OPTIONS = [
-  500, 750, 1000, 1250, 1500, 1750, 2000, 2500, 3000, 3500, 4000, 5000, 7500,
-];
 
 function num(v: string): number | null {
   if (v.trim() === "") return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+function MultiChip({
+  options,
+  selected,
+  onToggle,
+}: {
+  options: { key?: string; value?: string; label: string }[];
+  selected: Set<string>;
+  onToggle: (value: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((opt) => {
+        const val = opt.key ?? opt.value!;
+        const active = selected.has(val);
+        return (
+          <button
+            key={val}
+            type="button"
+            onClick={() => onToggle(val)}
+            className={`px-4 py-2 text-xs uppercase tracking-wider border transition-colors ${
+              active
+                ? "bg-[#d4a012] text-white border-[#d4a012]"
+                : "bg-white text-neutral-600 border-neutral-300 hover:border-[#d4a012]"
+            }`}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 export function NewsletterPreferences({
@@ -63,11 +98,11 @@ export function NewsletterPreferences({
   const [propTypes, setPropTypes] = useState<Set<string>>(
     new Set(initialFilters.property_types)
   );
-  const [minPrice, setMinPrice] = useState<string>(
-    initialFilters.min_price?.toString() ?? ""
+  const [priceRanges, setPriceRanges] = useState<Set<string>>(
+    new Set(initialFilters.price_ranges)
   );
-  const [maxPrice, setMaxPrice] = useState<string>(
-    initialFilters.max_price?.toString() ?? ""
+  const [sqftRanges, setSqftRanges] = useState<Set<string>>(
+    new Set(initialFilters.sqft_ranges)
   );
   const [minBeds, setMinBeds] = useState<string>(
     initialFilters.min_beds?.toString() ?? ""
@@ -75,18 +110,24 @@ export function NewsletterPreferences({
   const [minBaths, setMinBaths] = useState<string>(
     initialFilters.min_baths?.toString() ?? ""
   );
-  const [minSqft, setMinSqft] = useState<string>(
-    initialFilters.min_sqft?.toString() ?? ""
-  );
-  const [maxSqft, setMaxSqft] = useState<string>(
-    initialFilters.max_sqft?.toString() ?? ""
-  );
 
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{
     kind: "ok" | "err";
     text: string;
   } | null>(null);
+
+  function makeToggle(setter: React.Dispatch<React.SetStateAction<Set<string>>>) {
+    return (value: string) => {
+      setter((prev) => {
+        const next = new Set(prev);
+        if (next.has(value)) next.delete(value);
+        else next.add(value);
+        return next;
+      });
+      setMessage(null);
+    };
+  }
 
   function toggleCity(city: string) {
     const next = new Set(selected);
@@ -96,24 +137,14 @@ export function NewsletterPreferences({
     setMessage(null);
   }
 
-  function togglePropType(t: string) {
-    const next = new Set(propTypes);
-    if (next.has(t)) next.delete(t);
-    else next.add(t);
-    setPropTypes(next);
-    setMessage(null);
-  }
-
   function currentPayload() {
     return {
       cities: Array.from(selected),
       filter_property_types: Array.from(propTypes),
-      filter_min_price: num(minPrice),
-      filter_max_price: num(maxPrice),
+      filter_price_ranges: Array.from(priceRanges),
+      filter_sqft_ranges: Array.from(sqftRanges),
       filter_min_beds: num(minBeds),
       filter_min_baths: num(minBaths),
-      filter_min_sqft: num(minSqft),
-      filter_max_sqft: num(maxSqft),
     };
   }
 
@@ -198,77 +229,42 @@ export function NewsletterPreferences({
         </h3>
 
         <div className="space-y-6">
-          {/* Property type */}
           <div>
             <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-3">
               Property type
             </label>
-            <div className="flex flex-wrap gap-2">
-              {PROPERTY_TYPE_OPTIONS.map((opt) => {
-                const active = propTypes.has(opt.value);
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => togglePropType(opt.value)}
-                    className={`px-4 py-2 text-xs uppercase tracking-wider border transition-colors ${
-                      active
-                        ? "bg-[#d4a012] text-white border-[#d4a012]"
-                        : "bg-white text-neutral-600 border-neutral-300 hover:border-[#d4a012]"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
+            <MultiChip
+              options={PROPERTY_TYPE_OPTIONS.map((o) => ({
+                value: o.value,
+                label: o.label,
+              }))}
+              selected={propTypes}
+              onToggle={makeToggle(setPropTypes)}
+            />
           </div>
 
-          {/* Price */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-3">
-                Min price
-              </label>
-              <select
-                value={minPrice}
-                onChange={(e) => {
-                  setMinPrice(e.target.value);
-                  setMessage(null);
-                }}
-                className="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-neutral-200 focus:outline-none focus:border-[#d4a012] text-neutral-900"
-              >
-                <option value="">Any</option>
-                {PRICE_OPTIONS.map((p) => (
-                  <option key={p} value={p}>
-                    {priceLabel(p)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-3">
-                Max price
-              </label>
-              <select
-                value={maxPrice}
-                onChange={(e) => {
-                  setMaxPrice(e.target.value);
-                  setMessage(null);
-                }}
-                className="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-neutral-200 focus:outline-none focus:border-[#d4a012] text-neutral-900"
-              >
-                <option value="">Any</option>
-                {PRICE_OPTIONS.map((p) => (
-                  <option key={p} value={p}>
-                    {priceLabel(p)}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-3">
+              Price range
+            </label>
+            <MultiChip
+              options={PRICE_RANGES}
+              selected={priceRanges}
+              onToggle={makeToggle(setPriceRanges)}
+            />
           </div>
 
-          {/* Beds + Baths */}
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-3">
+              Home size (sqft)
+            </label>
+            <MultiChip
+              options={SQFT_RANGES}
+              selected={sqftRanges}
+              onToggle={makeToggle(setSqftRanges)}
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-3">
@@ -306,50 +302,6 @@ export function NewsletterPreferences({
                 {BATH_OPTIONS.map((b) => (
                   <option key={b} value={b}>
                     {b}+
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Sqft */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-3">
-                Min sqft
-              </label>
-              <select
-                value={minSqft}
-                onChange={(e) => {
-                  setMinSqft(e.target.value);
-                  setMessage(null);
-                }}
-                className="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-neutral-200 focus:outline-none focus:border-[#d4a012] text-neutral-900"
-              >
-                <option value="">Any</option>
-                {SQFT_OPTIONS.map((s) => (
-                  <option key={s} value={s}>
-                    {s.toLocaleString()}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-3">
-                Max sqft
-              </label>
-              <select
-                value={maxSqft}
-                onChange={(e) => {
-                  setMaxSqft(e.target.value);
-                  setMessage(null);
-                }}
-                className="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-neutral-200 focus:outline-none focus:border-[#d4a012] text-neutral-900"
-              >
-                <option value="">Any</option>
-                {SQFT_OPTIONS.map((s) => (
-                  <option key={s} value={s}>
-                    {s.toLocaleString()}
                   </option>
                 ))}
               </select>

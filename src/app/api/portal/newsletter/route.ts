@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { FEATURED_CITIES } from "@/lib/redfin-listings";
 import { escapeHtml } from "@/lib/email-templates";
+import { isValidPriceKey, isValidSqftKey } from "@/lib/filter-ranges";
 
 const VALID_CITIES = new Set(FEATURED_CITIES.map((c) => c.name));
 
@@ -22,6 +23,12 @@ function numOrNull(v: unknown): number | null {
   if (v === null || v === undefined || v === "") return null;
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+function stringArray(v: unknown): string[] {
+  return Array.isArray(v)
+    ? (v as unknown[]).filter((x): x is string => typeof x === "string")
+    : [];
 }
 
 export async function POST(request: NextRequest) {
@@ -68,12 +75,26 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const filter_min_price = intOrNull(body?.filter_min_price);
-  const filter_max_price = intOrNull(body?.filter_max_price);
+  const priceRangesRaw = Array.from(new Set(stringArray(body?.filter_price_ranges)));
+  const invalidPrice = priceRangesRaw.filter((k) => !isValidPriceKey(k));
+  if (invalidPrice.length > 0) {
+    return NextResponse.json(
+      { error: `Unknown price ranges: ${invalidPrice.join(", ")}` },
+      { status: 400 }
+    );
+  }
+
+  const sqftRangesRaw = Array.from(new Set(stringArray(body?.filter_sqft_ranges)));
+  const invalidSqft = sqftRangesRaw.filter((k) => !isValidSqftKey(k));
+  if (invalidSqft.length > 0) {
+    return NextResponse.json(
+      { error: `Unknown sqft ranges: ${invalidSqft.join(", ")}` },
+      { status: 400 }
+    );
+  }
+
   const filter_min_beds = intOrNull(body?.filter_min_beds);
   const filter_min_baths = numOrNull(body?.filter_min_baths);
-  const filter_min_sqft = intOrNull(body?.filter_min_sqft);
-  const filter_max_sqft = intOrNull(body?.filter_max_sqft);
 
   // Read the existing row so we know whether to fire the admin notification
   const { data: existing } = await supabase
@@ -87,12 +108,10 @@ export async function POST(request: NextRequest) {
     .update({
       newsletter_cities: unique,
       filter_property_types: uniqueTypes,
-      filter_min_price,
-      filter_max_price,
+      filter_price_ranges: priceRangesRaw,
+      filter_sqft_ranges: sqftRangesRaw,
       filter_min_beds,
       filter_min_baths,
-      filter_min_sqft,
-      filter_max_sqft,
     })
     .eq("id", user.id);
 
@@ -132,12 +151,10 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     cities: unique,
     filter_property_types: uniqueTypes,
-    filter_min_price,
-    filter_max_price,
+    filter_price_ranges: priceRangesRaw,
+    filter_sqft_ranges: sqftRangesRaw,
     filter_min_beds,
     filter_min_baths,
-    filter_min_sqft,
-    filter_max_sqft,
   });
 }
 

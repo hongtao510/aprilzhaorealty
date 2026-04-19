@@ -3,6 +3,11 @@ import { Resend } from "resend";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { scrapeAllCities, type RedfinListing } from "@/lib/redfin-listings";
 import { buildSubscriberDigestHtml, type DigestListing, escapeHtml } from "@/lib/email-templates";
+import {
+  PRICE_RANGE_BUCKETS,
+  SQFT_RANGE_BUCKETS,
+  valueInAnyRange,
+} from "@/lib/filter-ranges";
 
 // Hobby plan max is 60s; scraping 12 cities needs ~30s
 export const maxDuration = 60;
@@ -373,7 +378,7 @@ async function sendSubscriberDigests(log: (msg: string) => void) {
   const { data: subscribers, error: subErr } = await supabase
     .from("profiles")
     .select(
-      "id, email, full_name, newsletter_cities, unsubscribe_token, filter_property_types, filter_min_price, filter_max_price, filter_min_beds, filter_min_baths, filter_min_sqft, filter_max_sqft"
+      "id, email, full_name, newsletter_cities, unsubscribe_token, filter_property_types, filter_price_ranges, filter_sqft_ranges, filter_min_beds, filter_min_baths"
     )
     .eq("newsletter_approved", true)
     .neq("newsletter_cities", "{}");
@@ -423,25 +428,21 @@ async function sendSubscriberDigests(log: (msg: string) => void) {
     const cities = (user.newsletter_cities ?? []) as string[];
     const cityListings = cities.flatMap((c) => byCity[c] ?? []);
 
-    // Apply per-user property filters (all AND'd; missing = no limit)
+    // Apply per-user property filters (all AND'd; empty = no limit)
     const allowedTypes = (user.filter_property_types ?? []) as string[];
-    const minPrice = user.filter_min_price as number | null;
-    const maxPrice = user.filter_max_price as number | null;
+    const priceRanges = (user.filter_price_ranges ?? []) as string[];
+    const sqftRanges = (user.filter_sqft_ranges ?? []) as string[];
     const minBeds = user.filter_min_beds as number | null;
     const minBaths = user.filter_min_baths as number | null;
-    const minSqft = user.filter_min_sqft as number | null;
-    const maxSqft = user.filter_max_sqft as number | null;
 
     const userListings: DigestListing[] = cityListings.filter((l) => {
       if (allowedTypes.length > 0) {
         if (!l.property_type || !allowedTypes.includes(l.property_type)) return false;
       }
-      if (minPrice != null && l.price < minPrice) return false;
-      if (maxPrice != null && l.price > maxPrice) return false;
+      if (!valueInAnyRange(l.price, priceRanges, PRICE_RANGE_BUCKETS)) return false;
+      if (!valueInAnyRange(l.sqft, sqftRanges, SQFT_RANGE_BUCKETS)) return false;
       if (minBeds != null && (l.beds == null || l.beds < minBeds)) return false;
       if (minBaths != null && (l.baths == null || l.baths < minBaths)) return false;
-      if (minSqft != null && (l.sqft == null || l.sqft < minSqft)) return false;
-      if (maxSqft != null && (l.sqft != null && l.sqft > maxSqft)) return false;
       return true;
     });
 
