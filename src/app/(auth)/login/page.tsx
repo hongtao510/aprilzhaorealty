@@ -6,15 +6,16 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 function LoginForm() {
-  const [email, setEmail] = useState("");
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get("redirect");
+  // Pre-fill from ?email= if signup routed us here (e.g., "email already registered")
+  const [email, setEmail] = useState(searchParams.get("email") ?? "");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [showReset, setShowReset] = useState(false);
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect");
 
   const supabase = createClient();
 

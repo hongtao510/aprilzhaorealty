@@ -12,6 +12,7 @@ export default function SignupPage() {
   const [phone, setPhone] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [alreadyRegistered, setAlreadyRegistered] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const supabase = createClient();
@@ -51,12 +52,22 @@ export default function SignupPage() {
       return;
     }
 
+    // Supabase anti-enumeration: when the email is already registered,
+    // signUp returns a fake user with identities=[] and no session.
+    // Distinguish this from a real first-time signup awaiting confirmation.
+    const identities = data.user?.identities ?? [];
+    if (data.user && identities.length === 0) {
+      setAlreadyRegistered(true);
+      setLoading(false);
+      return;
+    }
+
     // With email confirmations disabled, signUp returns a session; redirect.
     if (data.session) {
       router.push("/portal");
       router.refresh();
     } else {
-      // Fallback: confirmations re-enabled at the project level
+      // Real first-time signup, confirmation email sent
       setError(
         "Account created — please check your email to confirm before signing in."
       );
@@ -95,6 +106,38 @@ export default function SignupPage() {
           </div>
 
           <div className="bg-neutral-50 p-8 md:p-10">
+            {alreadyRegistered ? (
+              <div className="py-4">
+                <div className="mb-6 p-4 bg-amber-50 border border-amber-200 text-amber-900">
+                  <p className="text-sm font-medium mb-2">
+                    An account with <span className="font-semibold">{email}</span> already exists.
+                  </p>
+                  <p className="text-sm">
+                    Sign in to access it, or use a different email to create a new account.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-3">
+                  <Link
+                    href={`/login?email=${encodeURIComponent(email)}`}
+                    className="w-full px-12 py-4 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-[0.15em] hover:bg-[#b8890f] transition-all duration-300 text-center"
+                  >
+                    Sign In Instead
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAlreadyRegistered(false);
+                      setEmail("");
+                      setError(null);
+                    }}
+                    className="text-neutral-500 text-sm hover:text-neutral-900 transition-colors text-center"
+                  >
+                    Use a different email
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
             {error && (
               <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-700">
                 <p className="text-sm">{error}</p>
@@ -196,6 +239,8 @@ export default function SignupPage() {
                 Sign in
               </Link>
             </p>
+              </>
+            )}
           </div>
 
           <div className="text-center mt-8">
