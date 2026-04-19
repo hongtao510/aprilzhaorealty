@@ -21,10 +21,37 @@ interface ListingRow {
   property_type: string | null;
   image_url: string | null;
   first_seen_at: string | null;
+  status: string | null;
+  days_on_market: number | null;
+  last_seen_at: string | null;
 }
 
 function fmt(n: number): string {
   return new Intl.NumberFormat("en-US").format(n);
+}
+
+function statusBadge(status: string | null) {
+  const s = (status || "").toLowerCase();
+  // Redfin uses "active" for on-market. Anything else we style as neutral.
+  if (s.includes("active") || s.includes("for sale") || s === "") {
+    return { text: "For Sale", bg: "bg-emerald-600", fg: "text-white" };
+  }
+  if (s.includes("pending") || s.includes("contingent")) {
+    return { text: status!, bg: "bg-amber-500", fg: "text-white" };
+  }
+  if (s.includes("off") || s.includes("sold") || s.includes("closed")) {
+    return { text: "Off Market", bg: "bg-neutral-500", fg: "text-white" };
+  }
+  return { text: status!, bg: "bg-neutral-700", fg: "text-white" };
+}
+
+function daysAgo(iso: string | null): string | null {
+  if (!iso) return null;
+  const diff = Date.now() - new Date(iso).getTime();
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days <= 0) return "today";
+  if (days === 1) return "1 day ago";
+  return `${days} days ago`;
 }
 
 export default async function PortalListingsPage() {
@@ -55,7 +82,7 @@ export default async function PortalListingsPage() {
   let query = supabase
     .from("redfin_listings")
     .select(
-      "id, redfin_url, address, city, zip, price, beds, baths, sqft, year_built, property_type, image_url, first_seen_at"
+      "id, redfin_url, address, city, zip, price, beds, baths, sqft, year_built, property_type, image_url, first_seen_at, status, days_on_market, last_seen_at"
     )
     .eq("status", "active");
 
@@ -153,7 +180,7 @@ export default async function PortalListingsPage() {
                 rel="noopener noreferrer"
                 className="group block bg-white border border-neutral-200 overflow-hidden hover:border-[#d4a012] transition-colors"
               >
-                <div className="h-48 bg-neutral-100 overflow-hidden">
+                <div className="relative h-48 bg-neutral-100 overflow-hidden">
                   {l.image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -165,6 +192,23 @@ export default async function PortalListingsPage() {
                     <div className="w-full h-full flex items-center justify-center text-5xl text-neutral-300">
                       &#8962;
                     </div>
+                  )}
+                  {(() => {
+                    const b = statusBadge(l.status);
+                    return (
+                      <span
+                        className={`absolute top-3 left-3 px-2.5 py-1 text-[10px] font-medium uppercase tracking-widest ${b.bg} ${b.fg}`}
+                      >
+                        {b.text}
+                      </span>
+                    );
+                  })()}
+                  {l.days_on_market != null && l.days_on_market >= 0 && (
+                    <span className="absolute top-3 right-3 px-2.5 py-1 text-[10px] font-medium uppercase tracking-widest bg-white/90 text-neutral-700">
+                      {l.days_on_market === 0
+                        ? "New"
+                        : `${l.days_on_market}d on market`}
+                    </span>
                   )}
                 </div>
                 <div className="p-5">
@@ -178,10 +222,15 @@ export default async function PortalListingsPage() {
                     {l.city}
                     {l.zip ? ` ${l.zip}` : ""}
                   </p>
-                  <p className="text-xs text-neutral-500">
+                  <p className="text-xs text-neutral-500 mb-1">
                     {details}
                     {l.year_built ? ` · Built ${l.year_built}` : ""}
                   </p>
+                  {l.last_seen_at && (
+                    <p className="text-[11px] text-neutral-400">
+                      Last verified {daysAgo(l.last_seen_at)}
+                    </p>
+                  )}
                 </div>
               </a>
             );
