@@ -61,38 +61,12 @@ export function AuthProvider({
 
   useEffect(() => {
     let mounted = true;
-    let settled = false;
 
-    function settle() {
-      if (!settled && mounted) {
-        settled = true;
-        setLoading(false);
-      }
-    }
-
-    // Timeout: never hang more than 5 seconds
-    const timeout = setTimeout(() => {
-      console.warn("Auth init timed out after 5s");
-      settle();
-    }, 5000);
-
-    async function init() {
-      try {
-        const { data } = await supabase.auth.getUser();
-        if (!mounted) return;
-        setUser(data.user);
-        if (data.user) {
-          await fetchProfile(data.user.id);
-        }
-      } catch (err) {
-        console.error("Auth init failed:", err);
-      } finally {
-        clearTimeout(timeout);
-        settle();
-      }
-    }
-    init();
-
+    // Trust the SSR-hydrated initialUser/initialProfile. Don't call
+    // supabase.auth.getUser() on mount — it has been hanging on
+    // navigator.locks contention and blocking every other SDK call
+    // (including exchangeCodeForSession on /reset-password).
+    // onAuthStateChange still catches sign-in / sign-out events at runtime.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
@@ -105,13 +79,11 @@ export function AuthProvider({
         } else {
           setProfile(null);
         }
-        settle();
       }
     );
 
     return () => {
       mounted = false;
-      clearTimeout(timeout);
       subscription.unsubscribe();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
