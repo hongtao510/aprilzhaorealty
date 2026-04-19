@@ -6,6 +6,7 @@ import {
   SQFT_RANGE_BUCKETS,
   valueInAnyRange,
 } from "@/lib/filter-ranges";
+import { SortSelect } from "./SortSelect";
 
 interface ListingRow {
   id: string;
@@ -54,7 +55,57 @@ function daysAgo(iso: string | null): string | null {
   return `${days} days ago`;
 }
 
-export default async function PortalListingsPage() {
+type SortKey = "newest" | "price-asc" | "price-desc" | "size-asc" | "size-desc";
+
+const SORT_OPTIONS: Array<{ value: SortKey; label: string }> = [
+  { value: "newest", label: "Newest" },
+  { value: "price-asc", label: "Price: Low to High" },
+  { value: "price-desc", label: "Price: High to Low" },
+  { value: "size-desc", label: "Size: Largest First" },
+  { value: "size-asc", label: "Size: Smallest First" },
+];
+
+function parseSort(v: string | string[] | undefined): SortKey {
+  const raw = Array.isArray(v) ? v[0] : v;
+  const valid = SORT_OPTIONS.map((o) => o.value);
+  return valid.includes(raw as SortKey) ? (raw as SortKey) : "newest";
+}
+
+function sortListings(rows: ListingRow[], key: SortKey): ListingRow[] {
+  const cp = [...rows];
+  switch (key) {
+    case "price-asc":
+      cp.sort((a, b) => a.price - b.price);
+      break;
+    case "price-desc":
+      cp.sort((a, b) => b.price - a.price);
+      break;
+    case "size-asc":
+      // Listings without sqft sink to the bottom in ascending
+      cp.sort((a, b) => (a.sqft ?? Infinity) - (b.sqft ?? Infinity));
+      break;
+    case "size-desc":
+      cp.sort((a, b) => (b.sqft ?? -Infinity) - (a.sqft ?? -Infinity));
+      break;
+    case "newest":
+    default:
+      cp.sort((a, b) => {
+        const av = a.first_seen_at ?? "";
+        const bv = b.first_seen_at ?? "";
+        return bv.localeCompare(av);
+      });
+  }
+  return cp;
+}
+
+export default async function PortalListingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sort?: string | string[] }>;
+}) {
+  const sp = await searchParams;
+  const sortKey = parseSort(sp.sort);
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -103,13 +154,16 @@ export default async function PortalListingsPage() {
       valueInAnyRange(l.sqft, sqftRanges, SQFT_RANGE_BUCKETS)
   );
 
-  // Split active vs closed so we can render them in two sections
-  const active = matching
-    .filter((l) => (l.status || "").toLowerCase() === "active")
-    .slice(0, 60);
-  const closed = matching
-    .filter((l) => (l.status || "").toLowerCase() !== "active")
-    .slice(0, 30);
+  // Split active vs closed so we can render them in two sections, each
+  // independently sorted by the user's chosen sort key.
+  const activeAll = matching.filter(
+    (l) => (l.status || "").toLowerCase() === "active"
+  );
+  const closedAll = matching.filter(
+    (l) => (l.status || "").toLowerCase() !== "active"
+  );
+  const active = sortListings(activeAll, sortKey).slice(0, 60);
+  const closed = sortListings(closedAll, sortKey).slice(0, 30);
 
   const noCities = cities.length === 0;
 
@@ -147,12 +201,15 @@ export default async function PortalListingsPage() {
             </>
           )}
         </div>
-        <Link
-          href="/portal"
-          className="px-5 py-2 border border-neutral-300 text-xs uppercase tracking-wider text-neutral-600 hover:border-[#d4a012] hover:text-[#d4a012] transition-colors"
-        >
-          Edit preferences
-        </Link>
+        <div className="flex items-center gap-4 flex-wrap">
+          <SortSelect current={sortKey} options={SORT_OPTIONS} />
+          <Link
+            href="/portal"
+            className="px-5 py-2 border border-neutral-300 text-xs uppercase tracking-wider text-neutral-600 hover:border-[#d4a012] hover:text-[#d4a012] transition-colors"
+          >
+            Edit preferences
+          </Link>
+        </div>
       </div>
 
       {noCities ? (
