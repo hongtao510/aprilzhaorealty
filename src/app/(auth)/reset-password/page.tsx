@@ -36,7 +36,26 @@ export default function ResetPasswordPage() {
     );
 
     void (async () => {
-      // Already have a session? (e.g. previously exchanged)
+      // Case 1 — implicit flow: tokens in URL hash fragment
+      //   #access_token=...&refresh_token=...&type=recovery
+      // This is what Supabase's /auth/v1/verify redirects to.
+      if (window.location.hash.length > 1) {
+        const hashParams = new URLSearchParams(window.location.hash.slice(1));
+        const hashAccess = hashParams.get("access_token");
+        const hashType = hashParams.get("type");
+        if (hashAccess && hashType === "recovery") {
+          console.log("[reset-password] recovery tokens found in hash");
+          if (mounted) {
+            setAccessToken(hashAccess);
+            setRecoveryReady(true);
+          }
+          // Strip the hash so a refresh doesn't try to reuse these tokens
+          window.history.replaceState({}, "", window.location.pathname);
+          return;
+        }
+      }
+
+      // Case 2 — already have a session (browser carried it in cookies)
       const { data: existing } = await supabase.auth.getSession();
       if (existing.session) {
         console.log("[reset-password] existing session found");
@@ -47,7 +66,7 @@ export default function ResetPasswordPage() {
         return;
       }
 
-      // Try to exchange the ?code=... param for a session
+      // Case 3 — PKCE flow: ?code=... query param
       const url = new URL(window.location.href);
       const code = url.searchParams.get("code");
       if (code) {
@@ -64,7 +83,6 @@ export default function ResetPasswordPage() {
           return;
         }
         console.log("[reset-password] exchange succeeded");
-        // Strip the code from the URL so a refresh doesn't try to reuse it
         url.searchParams.delete("code");
         window.history.replaceState({}, "", url.toString());
         if (mounted) {
@@ -76,7 +94,7 @@ export default function ResetPasswordPage() {
         return;
       }
 
-      // No code, no session — wait for the implicit flow (#access_token=...) just in case
+      // No recovery signal in the URL — show a hint
       const timeout = setTimeout(() => {
         if (mounted && !recoveryReady) {
           setInfo(
