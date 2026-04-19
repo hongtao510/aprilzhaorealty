@@ -13,6 +13,9 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [recoveryReady, setRecoveryReady] = useState(false);
+  // Captured from the recovery session so we can bypass the SDK
+  // (which has been hanging on browser navigator.locks contention).
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const supabase = createClient();
 
   // Establish the recovery session. With @supabase/ssr the browser client
@@ -26,6 +29,7 @@ export default function ResetPasswordPage() {
         if (!mounted) return;
         if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && session)) {
           setRecoveryReady(true);
+          if (session?.access_token) setAccessToken(session.access_token);
           setError(null);
         }
       }
@@ -36,7 +40,10 @@ export default function ResetPasswordPage() {
       const { data: existing } = await supabase.auth.getSession();
       if (existing.session) {
         console.log("[reset-password] existing session found");
-        if (mounted) setRecoveryReady(true);
+        if (mounted) {
+          setAccessToken(existing.session.access_token);
+          setRecoveryReady(true);
+        }
         return;
       }
 
@@ -45,7 +52,8 @@ export default function ResetPasswordPage() {
       const code = url.searchParams.get("code");
       if (code) {
         console.log("[reset-password] exchanging code...");
-        const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
+        const { data: exchangeData, error: exchangeErr } =
+          await supabase.auth.exchangeCodeForSession(code);
         if (exchangeErr) {
           console.error("[reset-password] exchange failed:", exchangeErr);
           if (mounted) {
@@ -59,7 +67,12 @@ export default function ResetPasswordPage() {
         // Strip the code from the URL so a refresh doesn't try to reuse it
         url.searchParams.delete("code");
         window.history.replaceState({}, "", url.toString());
-        if (mounted) setRecoveryReady(true);
+        if (mounted) {
+          if (exchangeData?.session?.access_token) {
+            setAccessToken(exchangeData.session.access_token);
+          }
+          setRecoveryReady(true);
+        }
         return;
       }
 
@@ -94,26 +107,57 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    setLoading(true);
-    try {
-      const result = await Promise.race([
-        supabase.auth.updateUser({ password }),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Request timed out after 8s")), 8000)
-        ),
-      ]);
-      console.log("[reset-password] updateUser result:", result);
+    if (!accessToken) {
+      setError(
+        "No active recovery session. The link may be expired — request a new reset email."
+      );
+      return;
+    }
 
-      if (result.error) {
-        setError(`Could not update password: ${result.error.message}`);
+    setLoading(true);
+    // Call Supabase's REST API directly — bypasses the JS SDK's
+    // navigator.locks coordination which has been deadlocking with
+    // AuthProvider's concurrent session polling.
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const abort = new AbortController();
+    const timeoutId = setTimeout(() => abort.abort(), 10_000);
+    try {
+      const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
+        method: "PUT",
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password }),
+        signal: abort.signal,
+      });
+      clearTimeout(timeoutId);
+      console.log("[reset-password] PUT /auth/v1/user status:", res.status);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        console.error("[reset-password] update failed body:", body);
+        const msg =
+          body?.msg ||
+          body?.error_description ||
+          body?.message ||
+          `HTTP ${res.status}`;
+        setError(`Could not update password: ${msg}`);
         setLoading(false);
         return;
       }
       setDone(true);
       setLoading(false);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error("[reset-password] updateUser threw:", err);
+      clearTimeout(timeoutId);
+      const msg =
+        err instanceof Error
+          ? err.name === "AbortError"
+            ? "Request timed out after 10s"
+            : err.message
+          : String(err);
+      console.error("[reset-password] fetch threw:", err);
       setError(
         `Password update failed: ${msg}. Try again, or refresh and request a new reset email.`
       );
