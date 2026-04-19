@@ -24,9 +24,31 @@ const PROPERTY_TYPE_OPTIONS = [
   { value: "Townhouse", label: "Townhouse" },
 ];
 
+// Dropdown options — values in raw numbers, labels in friendly format.
+// Empty-string value = "Any" (null on save).
+const PRICE_OPTIONS = [
+  500_000, 750_000, 1_000_000, 1_250_000, 1_500_000, 1_750_000,
+  2_000_000, 2_250_000, 2_500_000, 3_000_000, 3_500_000, 4_000_000,
+  5_000_000, 7_500_000, 10_000_000,
+];
+
+function priceLabel(n: number): string {
+  if (n >= 1_000_000) {
+    const m = n / 1_000_000;
+    return `$${m % 1 === 0 ? m.toFixed(0) : m.toFixed(2).replace(/\.?0+$/, "")}M`;
+  }
+  return `$${(n / 1000).toFixed(0)}k`;
+}
+
+const BED_OPTIONS = [1, 2, 3, 4, 5, 6];
+const BATH_OPTIONS = [1, 1.5, 2, 2.5, 3, 3.5, 4, 5];
+const SQFT_OPTIONS = [
+  500, 750, 1000, 1250, 1500, 1750, 2000, 2500, 3000, 3500, 4000, 5000, 7500,
+];
+
 function num(v: string): number | null {
   if (v.trim() === "") return null;
-  const n = Number(v.replace(/[^0-9.]/g, ""));
+  const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
 
@@ -208,41 +230,41 @@ export function NewsletterPreferences({
               <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-3">
                 Min price
               </label>
-              <div className="flex items-center gap-2">
-                <span className="text-neutral-400">$</span>
-                <input
-                  type="number"
-                  min={0}
-                  step={50000}
-                  value={minPrice}
-                  onChange={(e) => {
-                    setMinPrice(e.target.value);
-                    setMessage(null);
-                  }}
-                  className="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-neutral-200 focus:outline-none focus:border-[#d4a012]"
-                  placeholder="any"
-                />
-              </div>
+              <select
+                value={minPrice}
+                onChange={(e) => {
+                  setMinPrice(e.target.value);
+                  setMessage(null);
+                }}
+                className="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-neutral-200 focus:outline-none focus:border-[#d4a012] text-neutral-900"
+              >
+                <option value="">Any</option>
+                {PRICE_OPTIONS.map((p) => (
+                  <option key={p} value={p}>
+                    {priceLabel(p)}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-3">
                 Max price
               </label>
-              <div className="flex items-center gap-2">
-                <span className="text-neutral-400">$</span>
-                <input
-                  type="number"
-                  min={0}
-                  step={50000}
-                  value={maxPrice}
-                  onChange={(e) => {
-                    setMaxPrice(e.target.value);
-                    setMessage(null);
-                  }}
-                  className="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-neutral-200 focus:outline-none focus:border-[#d4a012]"
-                  placeholder="any"
-                />
-              </div>
+              <select
+                value={maxPrice}
+                onChange={(e) => {
+                  setMaxPrice(e.target.value);
+                  setMessage(null);
+                }}
+                className="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-neutral-200 focus:outline-none focus:border-[#d4a012] text-neutral-900"
+              >
+                <option value="">Any</option>
+                {PRICE_OPTIONS.map((p) => (
+                  <option key={p} value={p}>
+                    {priceLabel(p)}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -252,37 +274,41 @@ export function NewsletterPreferences({
               <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-3">
                 Min beds
               </label>
-              <input
-                type="number"
-                min={0}
-                max={10}
-                step={1}
+              <select
                 value={minBeds}
                 onChange={(e) => {
                   setMinBeds(e.target.value);
                   setMessage(null);
                 }}
-                className="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-neutral-200 focus:outline-none focus:border-[#d4a012]"
-                placeholder="any"
-              />
+                className="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-neutral-200 focus:outline-none focus:border-[#d4a012] text-neutral-900"
+              >
+                <option value="">Any</option>
+                {BED_OPTIONS.map((b) => (
+                  <option key={b} value={b}>
+                    {b}+
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-3">
                 Min baths
               </label>
-              <input
-                type="number"
-                min={0}
-                max={10}
-                step={0.5}
+              <select
                 value={minBaths}
                 onChange={(e) => {
                   setMinBaths(e.target.value);
                   setMessage(null);
                 }}
-                className="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-neutral-200 focus:outline-none focus:border-[#d4a012]"
-                placeholder="any"
-              />
+                className="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-neutral-200 focus:outline-none focus:border-[#d4a012] text-neutral-900"
+              >
+                <option value="">Any</option>
+                {BATH_OPTIONS.map((b) => (
+                  <option key={b} value={b}>
+                    {b}+
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -292,35 +318,41 @@ export function NewsletterPreferences({
               <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-3">
                 Min sqft
               </label>
-              <input
-                type="number"
-                min={0}
-                step={100}
+              <select
                 value={minSqft}
                 onChange={(e) => {
                   setMinSqft(e.target.value);
                   setMessage(null);
                 }}
-                className="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-neutral-200 focus:outline-none focus:border-[#d4a012]"
-                placeholder="any"
-              />
+                className="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-neutral-200 focus:outline-none focus:border-[#d4a012] text-neutral-900"
+              >
+                <option value="">Any</option>
+                {SQFT_OPTIONS.map((s) => (
+                  <option key={s} value={s}>
+                    {s.toLocaleString()}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-3">
                 Max sqft
               </label>
-              <input
-                type="number"
-                min={0}
-                step={100}
+              <select
                 value={maxSqft}
                 onChange={(e) => {
                   setMaxSqft(e.target.value);
                   setMessage(null);
                 }}
-                className="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-neutral-200 focus:outline-none focus:border-[#d4a012]"
-                placeholder="any"
-              />
+                className="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-neutral-200 focus:outline-none focus:border-[#d4a012] text-neutral-900"
+              >
+                <option value="">Any</option>
+                {SQFT_OPTIONS.map((s) => (
+                  <option key={s} value={s}>
+                    {s.toLocaleString()}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
