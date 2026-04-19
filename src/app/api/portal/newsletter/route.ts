@@ -7,6 +7,23 @@ import { escapeHtml } from "@/lib/email-templates";
 
 const VALID_CITIES = new Set(FEATURED_CITIES.map((c) => c.name));
 
+const VALID_PROPERTY_TYPES = new Set([
+  "Single Family Residential",
+  "Condo/Co-op",
+  "Townhouse",
+]);
+
+function intOrNull(v: unknown): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? Math.floor(n) : null;
+}
+function numOrNull(v: unknown): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
   const {
@@ -36,6 +53,28 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Listing filters (all optional). Any missing / null value = no constraint.
+  const rawTypes = Array.isArray(body?.filter_property_types)
+    ? (body.filter_property_types as unknown[]).filter(
+        (t): t is string => typeof t === "string"
+      )
+    : [];
+  const uniqueTypes = Array.from(new Set(rawTypes));
+  const invalidTypes = uniqueTypes.filter((t) => !VALID_PROPERTY_TYPES.has(t));
+  if (invalidTypes.length > 0) {
+    return NextResponse.json(
+      { error: `Unknown property types: ${invalidTypes.join(", ")}` },
+      { status: 400 }
+    );
+  }
+
+  const filter_min_price = intOrNull(body?.filter_min_price);
+  const filter_max_price = intOrNull(body?.filter_max_price);
+  const filter_min_beds = intOrNull(body?.filter_min_beds);
+  const filter_min_baths = numOrNull(body?.filter_min_baths);
+  const filter_min_sqft = intOrNull(body?.filter_min_sqft);
+  const filter_max_sqft = intOrNull(body?.filter_max_sqft);
+
   // Read the existing row so we know whether to fire the admin notification
   const { data: existing } = await supabase
     .from("profiles")
@@ -45,7 +84,16 @@ export async function POST(request: NextRequest) {
 
   const { error } = await supabase
     .from("profiles")
-    .update({ newsletter_cities: unique })
+    .update({
+      newsletter_cities: unique,
+      filter_property_types: uniqueTypes,
+      filter_min_price,
+      filter_max_price,
+      filter_min_beds,
+      filter_min_baths,
+      filter_min_sqft,
+      filter_max_sqft,
+    })
     .eq("id", user.id);
 
   if (error) {
@@ -81,7 +129,16 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ cities: unique });
+  return NextResponse.json({
+    cities: unique,
+    filter_property_types: uniqueTypes,
+    filter_min_price,
+    filter_max_price,
+    filter_min_beds,
+    filter_min_baths,
+    filter_min_sqft,
+    filter_max_sqft,
+  });
 }
 
 async function notifyAdminOfPendingSubscriber(args: {

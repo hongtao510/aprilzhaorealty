@@ -372,7 +372,9 @@ async function sendSubscriberDigests(log: (msg: string) => void) {
 
   const { data: subscribers, error: subErr } = await supabase
     .from("profiles")
-    .select("id, email, full_name, newsletter_cities, unsubscribe_token")
+    .select(
+      "id, email, full_name, newsletter_cities, unsubscribe_token, filter_property_types, filter_min_price, filter_max_price, filter_min_beds, filter_min_baths, filter_min_sqft, filter_max_sqft"
+    )
     .eq("newsletter_approved", true)
     .neq("newsletter_cities", "{}");
 
@@ -387,7 +389,7 @@ async function sendSubscriberDigests(log: (msg: string) => void) {
 
   const { data: newListings, error: listErr } = await supabase
     .from("redfin_listings")
-    .select("redfin_url, address, city, zip, price, beds, baths, sqft, year_built, days_on_market, image_url")
+    .select("redfin_url, address, city, zip, price, beds, baths, sqft, year_built, days_on_market, image_url, property_type")
     .eq("is_new", true);
 
   if (listErr || !newListings?.length) {
@@ -395,8 +397,13 @@ async function sendSubscriberDigests(log: (msg: string) => void) {
     return;
   }
 
-  const byCity: Record<string, DigestListing[]> = {};
-  for (const l of newListings as DigestListing[]) {
+  // Cast once — property_type isn't in DigestListing but we use it for
+  // filtering before passing to the template.
+  type ListingWithType = DigestListing & { property_type: string | null };
+  const allNew = (newListings ?? []) as ListingWithType[];
+
+  const byCity: Record<string, ListingWithType[]> = {};
+  for (const l of allNew) {
     (byCity[l.city] ??= []).push(l);
   }
 
@@ -414,7 +421,30 @@ async function sendSubscriberDigests(log: (msg: string) => void) {
   const batch: BatchItem[] = [];
   for (const user of subscribers) {
     const cities = (user.newsletter_cities ?? []) as string[];
-    const userListings = cities.flatMap((c) => byCity[c] ?? []);
+    const cityListings = cities.flatMap((c) => byCity[c] ?? []);
+
+    // Apply per-user property filters (all AND'd; missing = no limit)
+    const allowedTypes = (user.filter_property_types ?? []) as string[];
+    const minPrice = user.filter_min_price as number | null;
+    const maxPrice = user.filter_max_price as number | null;
+    const minBeds = user.filter_min_beds as number | null;
+    const minBaths = user.filter_min_baths as number | null;
+    const minSqft = user.filter_min_sqft as number | null;
+    const maxSqft = user.filter_max_sqft as number | null;
+
+    const userListings: DigestListing[] = cityListings.filter((l) => {
+      if (allowedTypes.length > 0) {
+        if (!l.property_type || !allowedTypes.includes(l.property_type)) return false;
+      }
+      if (minPrice != null && l.price < minPrice) return false;
+      if (maxPrice != null && l.price > maxPrice) return false;
+      if (minBeds != null && (l.beds == null || l.beds < minBeds)) return false;
+      if (minBaths != null && (l.baths == null || l.baths < minBaths)) return false;
+      if (minSqft != null && (l.sqft == null || l.sqft < minSqft)) return false;
+      if (maxSqft != null && (l.sqft != null && l.sqft > maxSqft)) return false;
+      return true;
+    });
+
     if (userListings.length === 0) continue;
 
     const unsubscribeUrl = `${siteUrl}/api/newsletter/unsubscribe?token=${encodeURIComponent(user.unsubscribe_token)}`;

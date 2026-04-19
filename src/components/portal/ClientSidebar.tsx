@@ -14,6 +14,15 @@ const clientLinks = [
     ),
   },
   {
+    href: "/portal/listings",
+    label: "Browse Listings",
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9.5L12 3l9 6.5M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10" />
+      </svg>
+    ),
+  },
+  {
     href: "/portal/materials",
     label: "Materials",
     icon: (

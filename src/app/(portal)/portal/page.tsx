@@ -15,7 +15,9 @@ export default async function PortalPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, email, newsletter_cities")
+    .select(
+      "full_name, email, newsletter_cities, filter_property_types, filter_min_price, filter_max_price, filter_min_beds, filter_min_baths, filter_min_sqft, filter_max_sqft"
+    )
     .eq("id", user.id)
     .single();
 
@@ -38,11 +40,27 @@ export default async function PortalPage() {
           Listing Newsletter
         </h2>
         <p className="text-neutral-500 text-sm mb-8">
-          Select the Bay Area cities you&apos;d like to receive new-listing emails for.
-          We&apos;ll send a digest each morning when there are new listings in your
-          selected cities.
+          Select the cities and filters you care about — we&apos;ll email you
+          a morning digest when matching listings come on the market, and you
+          can{" "}
+          <a href="/portal/listings" className="text-[#d4a012] underline">
+            browse them anytime
+          </a>
+          .
         </p>
-        <NewsletterPreferences cities={cities} initialSelected={selected} />
+        <NewsletterPreferences
+          cities={cities}
+          initialSelected={selected}
+          initialFilters={{
+            property_types: (profile?.filter_property_types ?? []) as string[],
+            min_price: profile?.filter_min_price ?? null,
+            max_price: profile?.filter_max_price ?? null,
+            min_beds: profile?.filter_min_beds ?? null,
+            min_baths: profile?.filter_min_baths ?? null,
+            min_sqft: profile?.filter_min_sqft ?? null,
+            max_sqft: profile?.filter_max_sqft ?? null,
+          }}
+        />
       </section>
 
       <section>
