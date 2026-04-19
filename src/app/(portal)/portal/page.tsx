@@ -60,26 +60,6 @@ export default async function PortalPage() {
           }}
         />
       </section>
-
-      <section>
-        <h2 className="font-serif text-xl text-neutral-900 mb-4">
-          Concierge features
-        </h2>
-        <p className="text-neutral-500 text-sm mb-4">
-          Invited clients can access additional services:
-        </p>
-        <ul className="space-y-2 text-sm">
-          <li>
-            <a href="/portal/saved-homes" className="text-[#d4a012] underline">Saved homes</a>
-          </li>
-          <li>
-            <a href="/portal/messages" className="text-[#d4a012] underline">Messages</a>
-          </li>
-          <li>
-            <a href="/portal/materials" className="text-[#d4a012] underline">Materials</a>
-          </li>
-        </ul>
-      </section>
     </main>
   );
 }
