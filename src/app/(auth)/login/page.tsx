@@ -35,15 +35,35 @@ function LoginForm() {
       return;
     }
 
-    // Get role to determine redirect
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", data.user.id)
-      .single();
+    // Look up role via the Supabase REST API directly — bypasses the JS
+    // SDK's navigator.locks so the redirect can't hang post-login.
+    // Races against a 2s timeout; falls back to /portal (middleware will
+    // bounce admins to /admin) if the profile fetch is slow or fails.
+    let role: string | null = null;
+    try {
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 2000);
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/profiles?id=eq.${data.user.id}&select=role`,
+        {
+          headers: {
+            apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            Authorization: `Bearer ${data.session?.access_token ?? ""}`,
+          },
+          signal: controller.signal,
+        }
+      );
+      clearTimeout(t);
+      if (res.ok) {
+        const rows = (await res.json()) as { role?: string }[];
+        role = rows[0]?.role ?? null;
+      }
+    } catch {
+      // Timeout or network error — fall through to default destination
+    }
 
     const destination =
-      redirect || (profile?.role === "admin" ? "/admin" : "/portal");
+      redirect || (role === "admin" ? "/admin" : "/portal");
     router.push(destination);
     router.refresh();
   }

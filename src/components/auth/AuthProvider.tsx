@@ -70,12 +70,16 @@ export function AuthProvider({
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
-      async (_event: AuthChangeEvent, session: Session | null) => {
+      (_event: AuthChangeEvent, session: Session | null) => {
         if (!mounted) return;
         const currentUser = session?.user ?? null;
         setUser(currentUser);
         if (currentUser) {
-          await fetchProfile(currentUser.id);
+          // Fire-and-forget: don't await inside the listener. If we await,
+          // we can hold the SDK's navigator.locks while other SDK calls
+          // are trying to proceed, causing the entire signin-then-redirect
+          // flow to deadlock.
+          void fetchProfile(currentUser.id);
         } else {
           setProfile(null);
         }
