@@ -33,6 +33,11 @@ export default function SignupPage() {
       email,
       password,
       options: {
+        // Where the confirmation email link should land the user.
+        // Routed through /api/auth/callback so the code exchange runs
+        // before the portal redirect. Using window.location.origin makes
+        // this environment-aware (works on localhost AND prod).
+        emailRedirectTo: `${window.location.origin}/api/auth/callback?next=/portal`,
         data: {
           full_name: fullName.trim(),
           phone: phone.trim() || null,
