@@ -7,8 +7,42 @@ const SCRAPE_TIMEOUT = 20_000; // 20s total for all scraping attempts
 // We use a ~2-mile radius around the zip code center.
 // For unknown zips, we geocode on the fly using Redfin's autocomplete.
 const ZIP_BOUNDS: Record<string, { south: number; north: number; west: number; east: number }> = {
-  // Pre-cached for known areas (add more as needed)
-  "94002": { south: 37.495, north: 37.535, west: -122.305, east: -122.245 }, // Belmont, CA
+  // Pre-cached SF Peninsula + Silicon Valley zips (~2mi radius around center)
+  "94002": { south: 37.495, north: 37.535, west: -122.305, east: -122.245 }, // Belmont
+  "94010": { south: 37.555, north: 37.595, west: -122.380, east: -122.320 }, // Burlingame
+  "94014": { south: 37.665, north: 37.705, west: -122.440, east: -122.380 }, // Daly City / Colma
+  "94015": { south: 37.660, north: 37.700, west: -122.500, east: -122.440 }, // Daly City
+  "94025": { south: 37.430, north: 37.490, west: -122.220, east: -122.150 }, // Menlo Park
+  "94027": { south: 37.430, north: 37.470, west: -122.220, east: -122.180 }, // Atherton
+  "94030": { south: 37.580, north: 37.620, west: -122.400, east: -122.340 }, // Millbrae
+  "94061": { south: 37.450, north: 37.490, west: -122.260, east: -122.200 }, // Redwood City
+  "94062": { south: 37.420, north: 37.480, west: -122.300, east: -122.230 }, // Redwood City / Emerald Hills
+  "94063": { south: 37.470, north: 37.510, west: -122.230, east: -122.170 }, // Redwood City
+  "94065": { south: 37.520, north: 37.555, west: -122.270, east: -122.230 }, // Redwood Shores
+  "94066": { south: 37.610, north: 37.650, west: -122.460, east: -122.400 }, // San Bruno
+  "94070": { south: 37.485, north: 37.525, west: -122.290, east: -122.230 }, // San Carlos
+  "94080": { south: 37.625, north: 37.685, west: -122.460, east: -122.400 }, // South San Francisco
+  "94401": { south: 37.555, north: 37.585, west: -122.340, east: -122.300 }, // San Mateo (downtown)
+  "94402": { south: 37.520, north: 37.555, west: -122.360, east: -122.300 }, // San Mateo (west)
+  "94403": { south: 37.510, north: 37.550, west: -122.345, east: -122.285 }, // San Mateo (east/Hillsdale)
+  "94404": { south: 37.540, north: 37.580, west: -122.290, east: -122.230 }, // Foster City
+  "94301": { south: 37.430, north: 37.470, west: -122.180, east: -122.120 }, // Palo Alto
+  "94303": { south: 37.430, north: 37.480, west: -122.150, east: -122.080 }, // East Palo Alto / Palo Alto
+  "94304": { south: 37.385, north: 37.435, west: -122.200, east: -122.140 }, // Palo Alto (Stanford)
+  "94306": { south: 37.400, north: 37.440, west: -122.160, east: -122.100 }, // Palo Alto
+  "94022": { south: 37.350, north: 37.400, west: -122.140, east: -122.080 }, // Los Altos
+  "94024": { south: 37.330, north: 37.380, west: -122.130, east: -122.070 }, // Los Altos
+  "94040": { south: 37.355, north: 37.400, west: -122.110, east: -122.050 }, // Mountain View
+  "94041": { south: 37.370, north: 37.410, west: -122.100, east: -122.040 }, // Mountain View
+  "94043": { south: 37.395, north: 37.440, west: -122.110, east: -122.040 }, // Mountain View
+  "94087": { south: 37.330, north: 37.370, west: -122.060, east: -121.990 }, // Sunnyvale
+  "94089": { south: 37.395, north: 37.435, west: -122.050, east: -121.980 }, // Sunnyvale
+  "94085": { south: 37.370, north: 37.405, west: -122.050, east: -121.985 }, // Sunnyvale
+  "94086": { south: 37.355, north: 37.395, west: -122.060, east: -121.985 }, // Sunnyvale
+  "95014": { south: 37.305, north: 37.345, west: -122.080, east: -122.000 }, // Cupertino
+  "95051": { south: 37.330, north: 37.370, west: -121.990, east: -121.930 }, // Santa Clara
+  "95129": { south: 37.300, north: 37.340, west: -122.000, east: -121.940 }, // San Jose (West)
+  "95070": { south: 37.250, north: 37.290, west: -122.060, east: -121.990 }, // Saratoga
 };
 
 /** Wrap a promise with a timeout. */
@@ -45,52 +79,40 @@ async function getBoundsForZip(
     return ZIP_BOUNDS[zip];
   }
 
-  // Try Redfin autocomplete to get lat/long for the zip, then build a ~2mi box
+  // Fall back to zippopotam.us — free, no auth, returns lat/lng for US zips
   try {
-    info(`Looking up coordinates for zip ${zip}...`);
-    const res = await fetch(
-      `https://www.redfin.com/stingray/do/location-autocomplete?location=${zip}&v=2`,
-      {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-        },
+    info(`Looking up coordinates for zip ${zip} via zippopotam.us...`);
+    const res = await fetch(`https://api.zippopotam.us/us/${zip}`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; aprilzhaorealty/1.0)",
       },
-    );
+    });
 
     if (!res.ok) {
-      info(`Autocomplete API returned ${res.status}`);
+      info(`Zippopotam returned ${res.status} for zip ${zip}`);
       return null;
     }
 
-    const text = await res.text();
-    // Response format: {}&&{...json...}
-    const jsonStr = text.replace(/^{}&&/, "");
-    const data = JSON.parse(jsonStr);
-
-    // Look for a matching zip code result
-    const sections = data?.payload?.sections ?? [];
-    for (const section of sections) {
-      for (const row of section.rows ?? []) {
-        if (row.id && row.lat && row.lng) {
-          const lat = row.lat;
-          const lng = row.lng;
-          // ~2 mile radius in degrees (approx)
-          const latDelta = 0.029; // ~2 miles
-          const lngDelta = 0.036; // ~2 miles at ~37° latitude
-          const bounds = {
-            south: lat - latDelta,
-            north: lat + latDelta,
-            west: lng - lngDelta,
-            east: lng + lngDelta,
-          };
-          info(`Found coordinates for zip ${zip}: ${lat}, ${lng}`);
-          return bounds;
-        }
-      }
+    const data = await res.json();
+    const place = data?.places?.[0];
+    if (!place?.latitude || !place?.longitude) {
+      info(`No coordinates in zippopotam response for zip ${zip}`);
+      return null;
     }
 
-    info(`No coordinates found for zip ${zip}`);
-    return null;
+    const lat = parseFloat(place.latitude);
+    const lng = parseFloat(place.longitude);
+    // ~2 mile radius in degrees
+    const latDelta = 0.029;
+    const lngDelta = 0.036;
+    const bounds = {
+      south: lat - latDelta,
+      north: lat + latDelta,
+      west: lng - lngDelta,
+      east: lng + lngDelta,
+    };
+    info(`Found coordinates for zip ${zip}: ${lat}, ${lng}`);
+    return bounds;
   } catch (err) {
     info(`Geocode failed: ${err instanceof Error ? err.message : String(err)}`);
     return null;
@@ -163,6 +185,7 @@ export async function scrapeWithRedfinApi(
       // URL, SOURCE, MLS#, FAVORITE, INTERESTED, LATITUDE, LONGITUDE
       const cols = parseCSVLine(line);
 
+      const property_type = (cols[2] ?? "").trim() || null;
       const sold_date = parseRedfinDate(cols[1] ?? "");
       const address = `${cols[3] ?? ""}, ${cols[4] ?? ""}, ${cols[5] ?? ""} ${cols[6] ?? ""}`.trim();
       const sold_price = parseFloat((cols[7] ?? "0").replace(/[^0-9.]/g, "")) || 0;
@@ -170,7 +193,10 @@ export async function scrapeWithRedfinApi(
       const baths = parseFloat(cols[9] ?? "0") || 0;
       const sqft = parseFloat((cols[11] ?? "0").replace(/[^0-9.]/g, "")) || 0;
       const lot_sqft_raw = parseFloat((cols[12] ?? "0").replace(/[^0-9.]/g, "")) || 0;
+      const year_built_raw = parseInt(cols[13] ?? "");
       const redfin_url = cols[20] ?? "";
+      const lat = parseFloat(cols[25] ?? "");
+      const lng = parseFloat(cols[26] ?? "");
 
       if (address && sold_price > 0 && sqft > 0) {
         comps.push({
@@ -182,6 +208,10 @@ export async function scrapeWithRedfinApi(
           baths,
           lot_sqft: lot_sqft_raw > 0 ? lot_sqft_raw : null,
           redfin_url,
+          latitude: Number.isFinite(lat) ? lat : null,
+          longitude: Number.isFinite(lng) ? lng : null,
+          property_type,
+          year_built: Number.isFinite(year_built_raw) && year_built_raw > 1800 ? year_built_raw : null,
         });
       }
     } catch {

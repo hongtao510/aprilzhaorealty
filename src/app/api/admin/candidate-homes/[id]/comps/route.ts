@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import Anthropic from "@anthropic-ai/sdk";
-import type { CompsResult, RawComp, ScrapeResult } from "@/lib/types";
+import type { CompsResult, RawComp, ScoredComp, ScrapeResult } from "@/lib/types";
 import { scrapeComps } from "@/lib/redfin-scraper";
+import { computeEstimate } from "@/lib/comps/pricing";
+import { scoreComps, type SubjectGeo } from "@/lib/comps/similarity";
+import { fetchPropertyFactsBatch, fetchPropertyFacts } from "@/lib/redfin-property-facts";
+import { computeTrendFromComps, timeAdjustPrice } from "@/lib/comps/trend";
+
+const TOP_N_FOR_PROMPT = 10;
+/** Fetch property facts for top-K candidates + subject before scoring. */
+const TOP_N_FOR_ENRICHMENT = 12;
+/** Best-effort budget for the parallel fact-fetch step. */
+const ENRICHMENT_BUDGET_MS = 8_000;
 
 const VALID_MODELS = [
   "claude-opus-4-6",
@@ -47,6 +57,39 @@ function extractZip(address: string): string | null {
   return match ? match[1] : null;
 }
 
+/** Overwrite Claude's estimate fields with deterministic math computed from the returned comps. */
+function applyDeterministicEstimate(
+  result: CompsResult,
+  subjectSqft: number,
+): CompsResult {
+  if (!result.comps?.length || !subjectSqft || subjectSqft <= 0) return result;
+
+  const marketTemperature =
+    result.estimate?.market_temperature ?? ("warm" as const);
+  const explicitTrendPct =
+    typeof result.estimate?.trend_adjustment_pct === "number"
+      ? result.estimate.trend_adjustment_pct
+      : undefined;
+
+  // Use weighted median (robust to bimodal pools) and hybrid strategy
+  // (lot value matters for small homes in this market).
+  const estimate = computeEstimate({
+    subjectSqft,
+    subjectLotSqft: result.subject?.lot_sqft ?? null,
+    comps: result.comps.map((c) => ({
+      sold_price: c.sold_price,
+      sqft: c.sqft,
+      similarity_score: c.similarity_score,
+      lot_sqft: c.lot_sqft,
+    })),
+    marketTemperature,
+    trendPct: explicitTrendPct,
+    strategy: "hybrid",
+  });
+
+  return { ...result, estimate };
+}
+
 async function verifyAdmin() {
   const supabase = await createClient();
   const {
@@ -68,93 +111,27 @@ async function verifyAdmin() {
   return { supabase, user, error: null, status: null };
 }
 
-const SYSTEM_PROMPT = `You are a real estate Comparative Market Analysis (CMA) expert. You will receive a subject property and must produce a structured CMA report using your knowledge of recent comparable sales in the area.
+const SYSTEM_PROMPT = `You are a real estate Comparative Market Analysis (CMA) expert. The application has already done the math: it scraped real recently-sold comps from the MLS via Redfin, and computed every numeric similarity, distance, and recency score deterministically. Your job is to add the human judgment on top.
 
 CRITICAL: Your entire response must be ONLY the raw JSON object. Start your response with { and end with }. Do NOT wrap in markdown code fences (no \`\`\`). Do NOT include any text before or after the JSON.
 
 === YOUR TASK ===
-1. You will receive the subject property details
-2. Find comparable recently sold homes in the area using your knowledge
-3. Score each comp, select the top 8, compute a price estimate, and produce the JSON output
+1. Read the subject property details and the pre-scored comp list (10 comps, ranked by total_score).
+2. Pick the BEST 8 of those 10 to include in the report. Use your judgment — usually the top 8 by total_score, but you may demote one for an obvious red flag (e.g., flip with extreme reno premium, atypical layout) and promote a lower-ranked comp in its place. Briefly note any swap in the "reasoning" field.
+3. For each of the 8 chosen comps, write a one-sentence "reason" explaining why it's relevant (e.g., "Same block, similar 1950s ranch layout, sold a month ago").
+4. Classify the local market temperature ("hot" / "warm" / "cool") based on your knowledge of the area at the listed sold-date range.
+5. Estimate market_signals (sale_to_list_ratio, days_on_market, yoy_change, mom_change) as best-effort summary strings — these are narrative, not used in math.
+6. Write a 2-3 sentence "reasoning" that summarizes the comp set, what's driving the spread of $/sqft, and any caveats (renovation premium, location tier difference, sparse data, etc.).
 
-=== SIMILARITY SCORING (scores are 0.0-1.0 decimals) ===
-Criterion 1 — House Size (50% weight):
-  size_diff = abs(comp_sqft - subject_sqft) / subject_sqft
-  score = max(0, 1 - size_diff / 0.20)
-  Similar if within 20% of subject sqft
-
-Criterion 2 — Bed+Bath Count (30% weight):
-  diff = abs((comp_beds + comp_baths) - (subject_beds + subject_baths))
-  score = max(0, 1 - diff / 3)
-  Similar if total bed+bath count differs by 3 or less
-
-Criterion 3 — Lot Size (20% weight):
-  lot_diff = abs(comp_lot - subject_lot) / subject_lot
-  score = max(0, 1 - lot_diff / 0.30)
-  Similar if within 30% of subject lot size
-
-Combined: similarity_score = 0.50 * size_score + 0.30 * bedbath_score + 0.20 * lot_score
-Filter out any comp where ALL three scores = 0.
-
-=== RECENCY SCORING ===
-Apply a recency multiplier to the similarity score based on how recently the comp sold:
-  months_ago = months between comp sold date and today
-  if months_ago <= 3:  recency_multiplier = 1.00
-  if months_ago <= 6:  recency_multiplier = 0.95
-  if months_ago <= 9:  recency_multiplier = 0.85
-  if months_ago <= 12: recency_multiplier = 0.70
-
-  total_score = similarity_score * recency_multiplier
-
-Comps older than 12 months: EXCLUDE entirely.
-
-Tie-breaking: more recent sale date wins, then closer distance wins.
-
-=== PRICE ESTIMATION ===
-1. IGNORE the subject property's listing price — it can be misleading
-2. For each comp: price_per_sqft = comp_sold_price / comp_sqft
-3. Weighted average: estimated_price_per_sqft = sum(comp_price_per_sqft * comp_score) / sum(comp_scores)
-4. comp_based = estimated_price_per_sqft * subject_sqft
-5. Round estimate to nearest $1,000
-
-=== MARKET TREND ADJUSTMENT ===
-Classify market temperature based on your knowledge of the local market:
-- "hot": median price up >2% MoM, homes selling above list, <14 days on market → adjust UP 2-5%
-- "warm": median price up 0-2% MoM, selling near list, 14-30 days on market → NO adjustment
-- "cool": median price flat/declining MoM, selling below list, >30 days on market → adjust DOWN 2-5%
-
-trend_adjusted = comp_based * (1 + trend_adjustment_pct / 100)
-
-=== RANGE BUILDING ===
-1. Collect all comp-implied prices: comp_price_per_sqft * subject_sqft (trend-adjusted)
-2. Compute weighted mean and weighted standard deviation
-3. Cap "most_likely" half-width: half_width = min(0.5 * std, 100000) — max $200k total width
-4. Build sub-ranges with $100,000 bands outward:
-   - most_likely (50%): [mean - half_width, mean + half_width]
-   - likely (25%): [mean - half_width - 100k, mean + half_width + 100k]
-   - possible (15%): [mean - half_width - 200k, mean + half_width + 200k]
-   - unlikely_below: below possible low
-   - unlikely_above: above possible high
-5. Round all range boundaries to nearest $25,000
+DO NOT recompute similarity, recency, distance, or any score — use the values provided. DO NOT compute price estimates, weighted averages, or ranges — the application does those deterministically from your selected comps.
 
 === OUTPUT SCHEMA ===
 CompsResult:
 {
-  "comps": [CompHome, ...],          // top 8 comparable recently-sold homes
+  "comps": [CompHome, ...],          // EXACTLY 8 comps from the provided list of 10
   "subject": { "address": string, "sqft": number, "beds": number, "baths": number, "lot_sqft": number },
   "estimate": {
-    "weighted_price_per_sqft": number,
-    "comp_based": number,
-    "trend_adjusted": number,
-    "market_temperature": "hot" | "warm" | "cool",
-    "trend_adjustment_pct": number,
-    "range": {
-      "most_likely": [low, high],
-      "likely": [low, high],
-      "possible": [low, high],
-      "unlikely_below": number,
-      "unlikely_above": number
-    }
+    "market_temperature": "hot" | "warm" | "cool"
   },
   "market_signals": {
     "sale_to_list_ratio": string,
@@ -165,7 +142,7 @@ CompsResult:
   "reasoning": string
 }
 
-CompHome:
+CompHome (copy numeric fields verbatim from the provided comp; only "reason" is yours to write):
 {
   "address": string,
   "sold_price": number,
@@ -174,9 +151,9 @@ CompHome:
   "beds": number,
   "baths": number,
   "lot_sqft": number,
-  "similarity_score": number,
+  "similarity_score": number,        // use the total_score from the provided comp
   "price_per_sqft": number,
-  "reason": string,
+  "reason": string,                  // your one-sentence narrative
   "redfin_url": string,
   "distance_miles": number
 }`;
@@ -242,20 +219,23 @@ function buildVerifiedCompsPrompt(opts: {
   subjectYearBuilt: number | string;
   propertyType: string;
   sourceUrl: string | null;
-  scrapedComps: RawComp[];
+  scoredComps: ScoredComp[];
   scrapeSource: string;
 }) {
   const {
     address, price, subjectBeds, subjectBaths, subjectSqft, subjectLot,
-    subjectYearBuilt, propertyType, sourceUrl, scrapedComps, scrapeSource,
+    subjectYearBuilt, propertyType, sourceUrl, scoredComps, scrapeSource,
   } = opts;
 
   const today = new Date().toISOString().split("T")[0];
   const fmt = (n: number) => new Intl.NumberFormat("en-US").format(n);
 
-  const compsTable = scrapedComps
-    .map((c, i) =>
-      `${i + 1}. ${c.address} | Sold: $${fmt(c.sold_price)} on ${c.sold_date || "unknown"} | ${c.beds}bd/${c.baths}ba | ${fmt(c.sqft)} sqft${c.lot_sqft ? ` | Lot: ${fmt(c.lot_sqft)} sqft` : ""}${c.redfin_url ? ` | ${c.redfin_url}` : ""}`
+  const compsTable = scoredComps
+    .map(
+      (c, i) =>
+        `${i + 1}. ${c.address}
+   sold: $${fmt(c.sold_price)} on ${c.sold_date} | ${c.beds}bd/${c.baths}ba | ${fmt(c.sqft)} sqft | $${Math.round(c.price_per_sqft)}/sf${c.lot_sqft ? ` | lot ${fmt(c.lot_sqft)} sqft` : ""}
+   total_score: ${c.total_score.toFixed(3)} | similarity ${c.similarity.toFixed(3)} | recency ${c.recency.toFixed(2)} | distance ${c.distance_miles.toFixed(2)}mi | tier ${c.tier_score.toFixed(2)}${c.redfin_url ? `\n   url: ${c.redfin_url}` : ""}`,
     )
     .join("\n");
 
@@ -273,17 +253,12 @@ Lot Size: ${typeof subjectLot === "number" ? `${fmt(subjectLot)} sqft` : subject
 Year Built: ${subjectYearBuilt}
 ${sourceUrl ? `Source URL: ${sourceUrl}` : ""}
 
-=== VERIFIED RECENTLY SOLD COMPS (scraped from Redfin via ${scrapeSource}) ===
-The following comps have VERIFIED sold prices from Redfin. Use ONLY these comps for your analysis.
-Do NOT invent or add additional comps. These prices are real transaction data.
+=== PRE-SCORED COMPS (top ${scoredComps.length} of recently sold homes from Redfin via ${scrapeSource}) ===
+These comps were retrieved from real MLS data and scored deterministically by the application. The total_score combines size, bed+bath, lot, distance, neighborhood-tier, and recency factors.
 
 ${compsTable}
 
-Score each comp using the similarity formula with recency adjustment, rank by total_score (recency-adjusted), select the top 8, and produce the CompsResult JSON. Exclude comps older than 12 months entirely. Remember to IGNORE the listing price when computing the price estimate.
-
-For any comp where lot_sqft is not available, use 0 for the lot_sqft field and reduce the lot_size weight to 0, redistributing its 20% weight equally to the other two criteria (house size becomes 60%, bed+bath becomes 40%).
-
-For the distance_miles field, estimate the distance from the subject property based on the addresses. If you cannot determine the distance, use 0.`;
+Pick the BEST 8 of the ${scoredComps.length} comps above. Default to the top 8 by total_score; only swap in a lower-ranked comp if there's a clear judgment reason (which you must note in "reasoning"). Use the numeric values verbatim — do not recompute. Write a one-sentence "reason" per comp and a short overall "reasoning" summary.`;
 }
 
 export async function POST(
@@ -403,18 +378,122 @@ export async function POST(
     console.log("[Scraper] Warning: no zip code found in address, skipping scrape");
   }
 
-  // Build prompt: verified data if available, otherwise Claude knowledge (unverified)
-  const userPrompt = scrapeResult.comps.length > 0
-    ? buildVerifiedCompsPrompt({
-        address, price, subjectBeds, subjectBaths, subjectSqft, subjectLot,
-        subjectYearBuilt, propertyType, sourceUrl,
-        scrapedComps: scrapeResult.comps,
-        scrapeSource: scrapeResult.source,
-      })
-    : buildUserPrompt({
-        address, price, subjectBeds, subjectBaths, subjectSqft, subjectLot,
-        subjectYearBuilt, propertyType, sourceUrl,
-      });
+  // --- Pre-score comps deterministically (1A + 1C/1D enrichment, 2D trend) ---
+  let scoredComps: ScoredComp[] = [];
+  let enrichedSubject: SubjectGeo | null = null;
+  let monthlyDriftPct = 0;
+  const enrichmentInfo = { attempted: 0, fetched: 0, ms: 0 };
+  if (scrapeResult.comps.length > 0) {
+    const subjectGeo: SubjectGeo = {
+      sqft: typeof subjectSqft === "number" ? subjectSqft : 0,
+      beds: typeof subjectBeds === "number" ? subjectBeds : 0,
+      baths: typeof subjectBaths === "number" ? subjectBaths : 0,
+      lot_sqft: typeof subjectLot === "number" ? subjectLot : null,
+      latitude: typeof home.latitude === "number" ? home.latitude : null,
+      longitude: typeof home.longitude === "number" ? home.longitude : null,
+      property_type: typeof home.property_type === "string" ? home.property_type : null,
+      year_built: typeof home.year_built === "number" ? home.year_built : null,
+    };
+
+    if (subjectGeo.sqft > 0) {
+      // First pass: rank by base similarity (no facts) to pick the top candidates worth enriching.
+      const baseScored = scoreComps(subjectGeo, scrapeResult.comps, new Date());
+      const enrichmentTargets = baseScored.slice(0, TOP_N_FOR_ENRICHMENT);
+
+      // Best-effort enrichment with budget — fetch facts for subject + top candidates in parallel.
+      const t0 = Date.now();
+      const urls = enrichmentTargets
+        .map((c) => c.redfin_url)
+        .filter((u): u is string => !!u);
+      enrichmentInfo.attempted = urls.length + (home.url ? 1 : 0);
+
+      try {
+        const enrichmentPromise = Promise.all([
+          fetchPropertyFactsBatch(urls, 4),
+          home.url ? fetchPropertyFacts(home.url) : Promise.resolve(null),
+        ]);
+        const enrichmentResult = await Promise.race([
+          enrichmentPromise,
+          new Promise<null>((resolve) =>
+            setTimeout(() => resolve(null), ENRICHMENT_BUDGET_MS),
+          ),
+        ]);
+
+        if (enrichmentResult) {
+          const [factsByUrl, subjectFacts] = enrichmentResult;
+          enrichmentInfo.fetched = factsByUrl.size + (subjectFacts ? 1 : 0);
+          enrichmentInfo.ms = Date.now() - t0;
+
+          if (subjectFacts) {
+            subjectGeo.neighborhood = subjectFacts.neighborhood;
+            subjectGeo.elementary_school_rating = subjectFacts.elementary_school_rating;
+            subjectGeo.renovation_tier = subjectFacts.renovation_tier;
+          }
+
+          // Enrich the raw comp pool with facts (only those in the top candidates we fetched).
+          const enrichedPool: RawComp[] = scrapeResult.comps.map((c) => {
+            const f = factsByUrl.get(c.redfin_url);
+            return f
+              ? {
+                  ...c,
+                  neighborhood: f.neighborhood,
+                  elementary_school_rating: f.elementary_school_rating,
+                  renovation_tier: f.renovation_tier,
+                }
+              : c;
+          });
+
+          // 2D — compute trend from the (full, unenriched) pool. Strict gating means it usually returns 0.
+          const trend = computeTrendFromComps(scrapeResult.comps, new Date(), 12);
+          monthlyDriftPct = trend.monthly_drift_pct;
+
+          // Time-adjust comp prices when trend is non-zero.
+          const adjustedPool: RawComp[] =
+            monthlyDriftPct !== 0
+              ? enrichedPool.map((c) => ({
+                  ...c,
+                  sold_price: timeAdjustPrice(c.sold_price, c.sold_date, new Date(), monthlyDriftPct),
+                }))
+              : enrichedPool;
+
+          const finalScored = scoreComps(subjectGeo, adjustedPool, new Date());
+          scoredComps = finalScored.slice(0, TOP_N_FOR_PROMPT);
+          enrichedSubject = subjectGeo;
+        } else {
+          console.log("[Enrichment] Budget exceeded — proceeding with base scoring");
+          scoredComps = baseScored.slice(0, TOP_N_FOR_PROMPT);
+          enrichedSubject = subjectGeo;
+        }
+      } catch (err) {
+        console.log(
+          `[Enrichment] Failed: ${err instanceof Error ? err.message : String(err)} — proceeding with base scoring`,
+        );
+        scoredComps = baseScored.slice(0, TOP_N_FOR_PROMPT);
+        enrichedSubject = subjectGeo;
+      }
+
+      console.log(
+        `[Scoring] ${baseScored.length} comps in window, enrichment ${enrichmentInfo.fetched}/${enrichmentInfo.attempted} in ${enrichmentInfo.ms}ms, top ${scoredComps.length} sent to Claude (trend ${monthlyDriftPct.toFixed(2)}%/mo)`,
+      );
+    } else {
+      console.log("[Scoring] Subject sqft unknown — falling back to unscored prompt");
+    }
+  }
+  void enrichedSubject; // reserved for future use
+
+  // Build prompt: pre-scored comps if scoring succeeded, otherwise Claude knowledge (unverified)
+  const userPrompt =
+    scoredComps.length > 0
+      ? buildVerifiedCompsPrompt({
+          address, price, subjectBeds, subjectBaths, subjectSqft, subjectLot,
+          subjectYearBuilt, propertyType, sourceUrl,
+          scoredComps,
+          scrapeSource: scrapeResult.source,
+        })
+      : buildUserPrompt({
+          address, price, subjectBeds, subjectBaths, subjectSqft, subjectLot,
+          subjectYearBuilt, propertyType, sourceUrl,
+        });
 
   // Non-streaming mode
   if (!stream) {
@@ -443,6 +522,11 @@ export async function POST(
     } catch {
       return NextResponse.json({ error: "Failed to parse Claude response as JSON", raw: rawResponse }, { status: 502 });
     }
+
+    compsResult = applyDeterministicEstimate(
+      compsResult,
+      typeof subjectSqft === "number" ? subjectSqft : compsResult.subject?.sqft ?? 0,
+    );
 
     await supabase.from("candidate_comps").delete().eq("candidate_home_id", id);
     await supabase.from("candidate_comps").insert({
@@ -482,8 +566,26 @@ export async function POST(
         send("log", { message: `Details: ${subjectBeds} bed / ${subjectBaths} bath / ${subjectSqft} sqft` });
         send("log", { message: `Listed at: ${typeof price === "number" ? `$${price.toLocaleString()}` : price}` });
 
-        if (scrapeResult.comps.length > 0) {
+        if (scoredComps.length > 0) {
           send("log", { message: `Data source: ${scrapeResult.comps.length} verified comps from ${scrapeResult.source}` });
+          if (enrichmentInfo.attempted > 0) {
+            send("log", { message: `Enriched ${enrichmentInfo.fetched}/${enrichmentInfo.attempted} listings with neighborhood/school/renovation facts (${enrichmentInfo.ms}ms)` });
+          }
+          if (monthlyDriftPct !== 0) {
+            send("log", { message: `Market trend (data-driven): ${monthlyDriftPct >= 0 ? "+" : ""}${monthlyDriftPct.toFixed(2)}%/mo — comp prices time-adjusted` });
+          }
+          send("log", { message: `Pre-scored top ${scoredComps.length} sent to Claude` });
+          const top3 = scoredComps.slice(0, 3);
+          for (const c of top3) {
+            const tags: string[] = [];
+            if (c.neighborhood) tags.push(c.neighborhood);
+            if (c.elementary_school_rating != null) tags.push(`school ${c.elementary_school_rating}/10`);
+            if (c.renovation_tier != null) tags.push(`reno-tier ${c.renovation_tier}`);
+            send("log", { message: `  • ${c.address.slice(0, 48)} — score ${c.total_score.toFixed(2)} (${c.distance_miles.toFixed(2)}mi)${tags.length ? " | " + tags.join(", ") : ""}` });
+          }
+        } else if (scrapeResult.comps.length > 0) {
+          send("log", { message: `Data source: ${scrapeResult.comps.length} verified comps from ${scrapeResult.source}` });
+          send("log", { message: "Pre-scoring skipped (subject sqft unknown) — Claude will rank using its knowledge" });
         } else {
           send("log", { message: "Data source: Claude knowledge (unverified) — scraping unavailable" });
         }
@@ -542,9 +644,16 @@ export async function POST(
         const compsCount = compsResult.comps?.length ?? 0;
         send("log", { message: `Found ${compsCount} comparable sales` });
 
+        compsResult = applyDeterministicEstimate(
+          compsResult,
+          typeof subjectSqft === "number" ? subjectSqft : compsResult.subject?.sqft ?? 0,
+        );
+
         if (compsResult.estimate) {
+          send("log", { message: `Computed estimate from ${compsCount} comps (deterministic)` });
+          send("log", { message: `Weighted $/sqft: $${compsResult.estimate.weighted_price_per_sqft?.toLocaleString()}` });
           send("log", { message: `Comp-based estimate: $${compsResult.estimate.comp_based?.toLocaleString()}` });
-          send("log", { message: `Market temperature: ${compsResult.estimate.market_temperature}` });
+          send("log", { message: `Market temperature: ${compsResult.estimate.market_temperature} (${compsResult.estimate.trend_adjustment_pct >= 0 ? "+" : ""}${compsResult.estimate.trend_adjustment_pct}%)` });
           send("log", { message: `Trend-adjusted estimate: $${compsResult.estimate.trend_adjusted?.toLocaleString()}` });
         }
 

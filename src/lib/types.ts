@@ -164,6 +164,33 @@ export interface RawComp {
   baths: number;
   lot_sqft: number | null; // may not be available from search results
   redfin_url: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  property_type?: string | null;
+  year_built?: number | null;
+  // Enriched from per-property page scrape (1C/1D)
+  neighborhood?: string | null;
+  elementary_school_rating?: number | null;
+  renovation_tier?: 0 | 1 | 2 | 3 | 4 | null;
+}
+
+/** Comp after deterministic similarity + recency scoring (1A pipeline). */
+export interface ScoredComp extends RawComp {
+  size_score: number;
+  bedbath_score: number;
+  lot_score: number;        // 0 if subject lot unknown (weight redistributed)
+  era_score: number;        // year-built similarity (condition proxy); 1.0 if either side missing
+  distance_miles: number;   // haversine; 0 if either side missing geo
+  distance_score: number;
+  tier_score: number;       // 1.0 (neutral) if insufficient data
+  neighborhood_score: number; // 1.0 same, 0.5 differ, 1.0 if either null
+  location_score: number;   // weighted blend of distance + tier + neighborhood
+  school_score: number;     // 1.0 if either side missing rating
+  renovation_score: number; // 1.0 if either side missing tier
+  similarity: number;       // 0..1, sum of weighted criteria
+  recency: number;          // 0..1, exp decay
+  total_score: number;      // similarity * recency
+  price_per_sqft: number;
 }
 
 /** Result from the scraping pipeline */
