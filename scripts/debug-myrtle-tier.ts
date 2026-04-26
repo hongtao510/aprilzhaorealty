@@ -85,6 +85,7 @@ for (const cfg of configs) {
     eraSpread: 30,
     schoolSpread: 5,
     enforcePropertyType: true,
+    enforceSameCity: false,
     maxDistanceMiles: 1.5,
   });
   const top10 = scored.slice(0, 10);

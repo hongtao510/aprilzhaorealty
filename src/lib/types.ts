@@ -168,6 +168,7 @@ export interface RawComp {
   longitude?: number | null;
   property_type?: string | null;
   year_built?: number | null;
+  city?: string | null;
   // Enriched from per-property page scrape (1C/1D)
   neighborhood?: string | null;
   elementary_school_rating?: number | null;

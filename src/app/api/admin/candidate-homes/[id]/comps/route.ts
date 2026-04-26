@@ -58,6 +58,16 @@ function extractZip(address: string): string | null {
   return match ? match[1] : null;
 }
 
+/** Extract the city portion of a "Street, City, ST ZIP" formatted address. */
+function extractCity(address: string): string | null {
+  const parts = address.split(",").map((p) => p.trim()).filter(Boolean);
+  // Expect "[Street, City, ST ZIP]" — city is the second-to-last when state+zip are joined,
+  // OR the second when there are 3+ comma-separated parts.
+  if (parts.length >= 3) return parts[parts.length - 2];
+  if (parts.length === 2) return parts[1].replace(/\s+(CA|California)\s+\d{5}.*$/i, "").trim() || null;
+  return null;
+}
+
 /** Overwrite Claude's estimate fields with deterministic math computed from the returned comps. */
 function applyDeterministicEstimate(
   result: CompsResult,
@@ -402,6 +412,7 @@ export async function POST(
       longitude: typeof home.longitude === "number" ? home.longitude : null,
       property_type: typeof home.property_type === "string" ? home.property_type : null,
       year_built: typeof home.year_built === "number" ? home.year_built : null,
+      city: extractCity(address),
     };
 
     if (subjectGeo.sqft > 0) {

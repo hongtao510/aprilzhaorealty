@@ -187,6 +187,7 @@ export async function scrapeWithRedfinApi(
 
       const property_type = (cols[2] ?? "").trim() || null;
       const sold_date = parseRedfinDate(cols[1] ?? "");
+      const city = (cols[4] ?? "").trim() || null;
       const address = `${cols[3] ?? ""}, ${cols[4] ?? ""}, ${cols[5] ?? ""} ${cols[6] ?? ""}`.trim();
       const sold_price = parseFloat((cols[7] ?? "0").replace(/[^0-9.]/g, "")) || 0;
       const beds = parseInt(cols[8] ?? "0") || 0;
@@ -212,6 +213,7 @@ export async function scrapeWithRedfinApi(
           longitude: Number.isFinite(lng) ? lng : null,
           property_type,
           year_built: Number.isFinite(year_built_raw) && year_built_raw > 1800 ? year_built_raw : null,
+          city,
         });
       }
     } catch {

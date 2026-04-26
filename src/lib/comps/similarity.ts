@@ -9,6 +9,7 @@ export interface SubjectGeo {
   longitude: number | null;
   property_type: string | null;
   year_built?: number | null;
+  city?: string | null;
   neighborhood?: string | null;
   elementary_school_rating?: number | null;
   renovation_tier?: 0 | 1 | 2 | 3 | 4 | null;
@@ -38,6 +39,8 @@ export interface ScoringConfig {
   schoolSpread: number;
   /** Hard-filter comps to subject's property_type when both are known. */
   enforcePropertyType: boolean;
+  /** Hard-filter comps to subject's city when both are known. Adjacent-city allowlist applied first. */
+  enforceSameCity: boolean;
   /** Hard exclude comps farther than this many miles from subject (when geo known on both sides). */
   maxDistanceMiles: number;
 }
@@ -54,8 +57,41 @@ export const DEFAULT_CONFIG: ScoringConfig = {
   eraSpread: 30,
   schoolSpread: 5,
   enforcePropertyType: true,
+  enforceSameCity: true,
   maxDistanceMiles: 1.5,
 };
+
+/**
+ * Cities treated as the same submarket. Belmont absorbs the unincorporated pocket
+ * of "San Carlos" homes that physically sit in the same school/zip footprint, etc.
+ * Bidirectional — if A is in B's allowlist, B is in A's.
+ */
+const ADJACENT_CITY_ALIASES: Record<string, string[]> = {
+  "Redwood City": ["Emerald Hills", "Atherton"],
+  "Emerald Hills": ["Redwood City"],
+  "Belmont": [],
+  "San Mateo": [],
+  "San Carlos": [],
+  "Atherton": ["Redwood City", "Menlo Park"],
+  "Menlo Park": ["Atherton"],
+};
+
+function normalizeCity(c: string | null | undefined): string | null {
+  if (!c) return null;
+  return c.trim().replace(/\s+/g, " ");
+}
+
+function citiesMatch(a: string | null, b: string | null): boolean {
+  if (!a || !b) return true; // can't enforce when missing
+  const A = a.toLowerCase();
+  const B = b.toLowerCase();
+  if (A === B) return true;
+  const aliasesA = ADJACENT_CITY_ALIASES[a] ?? [];
+  if (aliasesA.some((x) => x.toLowerCase() === B)) return true;
+  const aliasesB = ADJACENT_CITY_ALIASES[b] ?? [];
+  if (aliasesB.some((x) => x.toLowerCase() === A)) return true;
+  return false;
+}
 
 export function haversineMiles(
   a: { lat: number; lng: number },
@@ -118,11 +154,32 @@ function parseSoldDate(s: string): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
+/** Minimum comp count after same-city filtering before falling back to no-city-filter. */
+const MIN_SAME_CITY_COMPS = 5;
+
 export function scoreComps(
   subject: SubjectGeo,
   rawComps: RawComp[],
   asOfDate: Date,
   config: ScoringConfig = DEFAULT_CONFIG,
+): ScoredComp[] {
+  const primary = scoreCompsInternal(subject, rawComps, asOfDate, config);
+  // If same-city enforcement stripped the pool too thin, retry without it (still respects all other filters).
+  if (
+    config.enforceSameCity &&
+    subject.city &&
+    primary.length < MIN_SAME_CITY_COMPS
+  ) {
+    return scoreCompsInternal(subject, rawComps, asOfDate, { ...config, enforceSameCity: false });
+  }
+  return primary;
+}
+
+function scoreCompsInternal(
+  subject: SubjectGeo,
+  rawComps: RawComp[],
+  asOfDate: Date,
+  config: ScoringConfig,
 ): ScoredComp[] {
   const subjectPpsfTier = localMedianPpsf(
     rawComps,
@@ -153,6 +210,8 @@ export function scoreComps(
 
   const out: ScoredComp[] = [];
 
+  const subjectCity = normalizeCity(subject.city);
+
   for (const c of rawComps) {
     // Hard property-type filter when both sides are known.
     if (
@@ -162,6 +221,11 @@ export function scoreComps(
       subject.property_type !== c.property_type
     ) {
       continue;
+    }
+
+    // Hard same-city filter (with adjacent-city allowlist).
+    if (config.enforceSameCity && subjectCity && c.city) {
+      if (!citiesMatch(subjectCity, normalizeCity(c.city))) continue;
     }
 
     const soldDate = parseSoldDate(c.sold_date);
