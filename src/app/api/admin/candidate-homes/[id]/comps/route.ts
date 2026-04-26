@@ -282,6 +282,14 @@ export async function POST(
     );
   }
   const model = modelParam as ValidModel;
+  // Opus 4.7+ deprecates the temperature param. Build per-model request opts.
+  const supportsTemperature = !model.startsWith("claude-opus-4-7");
+  const baseRequest = {
+    model,
+    max_tokens: 8192,
+    ...(supportsTemperature ? { temperature: 0 } : {}),
+    system: SYSTEM_PROMPT,
+  };
 
   // Fetch candidate home
   const { data: home, error: homeError } = await supabase
@@ -502,10 +510,7 @@ export async function POST(
     let rawResponse: string;
     try {
       const message = await anthropic.messages.create({
-        model,
-        max_tokens: 8192,
-        temperature: 0,
-        system: SYSTEM_PROMPT,
+        ...baseRequest,
         messages: [{ role: "user", content: userPrompt }],
       });
       const textBlock = message.content.find((b) => b.type === "text");
@@ -600,10 +605,7 @@ export async function POST(
         send("log", { message: "Streaming response from Claude..." });
 
         const sseStream = anthropic.messages.stream({
-          model,
-          max_tokens: 8192,
-          temperature: 0,
-          system: SYSTEM_PROMPT,
+          ...baseRequest,
           messages: [{ role: "user", content: userPrompt }],
         }, { signal: abortController.signal });
 
