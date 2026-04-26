@@ -16,6 +16,7 @@ type ModelOption = {
 };
 
 const models: ModelOption[] = [
+  { value: "claude-opus-4-7", label: "Opus 4.7 Latest" },
   { value: "claude-opus-4-6", label: "Opus 4.6 Best" },
   { value: "claude-sonnet-4-6", label: "Sonnet 4.6 Balanced" },
   { value: "claude-haiku-4-5-20251001", label: "Haiku 4.5 Fast" },
@@ -43,7 +44,7 @@ export default function CompsModal({
   homeAddress,
   homeId,
 }: CompsModalProps) {
-  const [model, setModel] = useState("claude-opus-4-6");
+  const [model, setModel] = useState("claude-opus-4-7");
   const [result, setResult] = useState<CompsResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

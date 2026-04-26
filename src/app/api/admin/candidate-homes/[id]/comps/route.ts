@@ -15,6 +15,7 @@ const TOP_N_FOR_ENRICHMENT = 12;
 const ENRICHMENT_BUDGET_MS = 8_000;
 
 const VALID_MODELS = [
+  "claude-opus-4-7",
   "claude-opus-4-6",
   "claude-sonnet-4-6",
   "claude-haiku-4-5-20251001",
