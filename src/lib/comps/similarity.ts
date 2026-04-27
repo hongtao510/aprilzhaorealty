@@ -25,7 +25,7 @@ export interface ScoringConfig {
     school: number;
     renovation: number;
   };
-  locationSubWeights: { distance: number; tier: number; neighborhood: number };
+  locationSubWeights: { distance: number; tier: number; neighborhood: number; city: number };
   recencyHalfLifeMonths: number;   // exp(-months/halfLife) — value at halfLife = 1/e ≈ 0.37
   maxRecencyMonths: number;        // hard cutoff
   distanceHalfLifeMiles: number;
@@ -47,7 +47,7 @@ export interface ScoringConfig {
 
 export const DEFAULT_CONFIG: ScoringConfig = {
   weights: { size: 0.30, bedbath: 0.15, lot: 0.10, location: 0.25, era: 0.08, school: 0.05, renovation: 0.07 },
-  locationSubWeights: { distance: 0.45, tier: 0.30, neighborhood: 0.25 },
+  locationSubWeights: { distance: 0.35, tier: 0.20, neighborhood: 0.20, city: 0.25 },
   recencyHalfLifeMonths: 12,
   maxRecencyMonths: 18,
   distanceHalfLifeMiles: 0.75,
@@ -57,7 +57,9 @@ export const DEFAULT_CONFIG: ScoringConfig = {
   eraSpread: 30,
   schoolSpread: 5,
   enforcePropertyType: true,
-  enforceSameCity: true,
+  // Soft city penalty (city_score multiplied into location) is the primary mechanism;
+  // hard same-city exclusion is opt-in for users who want strict-only-this-city pools.
+  enforceSameCity: false,
   maxDistanceMiles: 1.5,
 };
 
@@ -299,10 +301,18 @@ function scoreCompsInternal(
         subject.neighborhood.toLowerCase() === c.neighborhood.toLowerCase() ? 1.0 : 0.5;
     }
 
+    // City: 1.0 same (or adjacent allowlist), 0.5 different, 1.0 (neutral) if either side null
+    let city_score = 1;
+    const compCity = normalizeCity(c.city ?? null);
+    if (subjectCity && compCity) {
+      city_score = citiesMatch(subjectCity, compCity) ? 1.0 : 0.5;
+    }
+
     const location_score =
       config.locationSubWeights.distance * distance_score +
       config.locationSubWeights.tier * tier_score +
-      config.locationSubWeights.neighborhood * neighborhood_score;
+      config.locationSubWeights.neighborhood * neighborhood_score +
+      config.locationSubWeights.city * city_score;
 
     // School rating
     let school_score = 1;
@@ -347,6 +357,7 @@ function scoreCompsInternal(
       distance_score,
       tier_score,
       neighborhood_score,
+      city_score,
       location_score,
       school_score,
       renovation_score,

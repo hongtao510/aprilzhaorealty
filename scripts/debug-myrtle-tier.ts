@@ -75,7 +75,7 @@ for (const cfg of configs) {
   console.log(`\n=== Config: ${cfg.name} ===`);
   const scored = scoreComps(subject, raw, new Date("2026-04-26"), {
     weights: { size: 0.30, bedbath: 0.15, lot: 0.10, location: 0.25, era: 0.08, school: 0.05, renovation: 0.07 },
-    locationSubWeights: { distance: 0.45, tier: 0.30, neighborhood: 0.25 },
+    locationSubWeights: { distance: 0.35, tier: 0.20, neighborhood: 0.20, city: 0.25 },
     recencyHalfLifeMonths: 12,
     maxRecencyMonths: 18,
     distanceHalfLifeMiles: 0.75,

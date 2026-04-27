@@ -185,7 +185,8 @@ export interface ScoredComp extends RawComp {
   distance_score: number;
   tier_score: number;       // 1.0 (neutral) if insufficient data
   neighborhood_score: number; // 1.0 same, 0.5 differ, 1.0 if either null
-  location_score: number;   // weighted blend of distance + tier + neighborhood
+  city_score: number;       // 1.0 same (or adjacent allowlist), 0.5 differ, 1.0 if either null
+  location_score: number;   // weighted blend of distance + tier + neighborhood + city
   school_score: number;     // 1.0 if either side missing rating
   renovation_score: number; // 1.0 if either side missing tier
   similarity: number;       // 0..1, sum of weighted criteria
