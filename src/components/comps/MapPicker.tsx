@@ -13,7 +13,33 @@ const RENOVATION_LABEL: Record<number, string> = {
   4: "New construction",
 };
 
-function CompPreviewCard({ c, isSelected }: { c: CompHomeWithGeo; isSelected: boolean }) {
+/** Haversine miles. Returns null if either side missing geo. */
+function haversineMiles(
+  a: { lat: number; lng: number } | null,
+  b: { lat: number; lng: number } | null,
+): number | null {
+  if (!a || !b) return null;
+  const R = 3958.7613;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function CompPreviewCard({
+  c,
+  isSelected,
+  computedDistance,
+}: {
+  c: CompHomeWithGeo;
+  isSelected: boolean;
+  computedDistance: number | null;
+}) {
   const street = c.address.split(",")[0];
   const cityState = c.address.split(",").slice(1).join(",").trim();
   return (
@@ -46,7 +72,8 @@ function CompPreviewCard({ c, isSelected }: { c: CompHomeWithGeo; isSelected: bo
       </div>
 
       <div className="mt-1 text-neutral-500">
-        Sold {c.sold_date || "—"} · {(c.distance_miles ?? 0).toFixed(2)} mi away
+        Sold {c.sold_date || "—"}
+        {computedDistance != null ? ` · ${computedDistance.toFixed(2)} mi away` : ""}
       </div>
 
       {(c.neighborhood || c.elementary_school_rating != null || c.renovation_tier != null) && (
@@ -136,6 +163,18 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
     for (const c of candidates) if (c.latitude != null && c.longitude != null) pts.push([c.latitude, c.longitude]);
     return pts;
   }, [subject, candidates]);
+
+  // Recompute distance from the same lat/lng pair we plot on the map — guarantees the number
+  // shown matches what's on screen, ignoring any stale value baked into the candidate row.
+  const subjectLatLng = useMemo(
+    () => (subject.latitude != null && subject.longitude != null ? { lat: subject.latitude, lng: subject.longitude } : null),
+    [subject.latitude, subject.longitude],
+  );
+  const distanceFor = (c: CompHomeWithGeo): number | null =>
+    haversineMiles(
+      subjectLatLng,
+      c.latitude != null && c.longitude != null ? { lat: c.latitude, lng: c.longitude } : null,
+    );
 
   const sortedCandidates = useMemo(
     () => [...candidates].sort((a, b) => (b.total_score ?? 0) - (a.total_score ?? 0)),
@@ -286,7 +325,7 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
                     <td className="px-2 py-2 text-right">{formatMoney(c.sold_price)}</td>
                     <td className="px-2 py-2 text-right">${Math.round(c.price_per_sqft)}</td>
                     <td className="px-2 py-2 text-right">{(c.total_score ?? c.similarity_score ?? 0).toFixed(2)}</td>
-                    <td className="px-2 py-2 text-right">{(c.distance_miles ?? 0).toFixed(1)}mi</td>
+                    <td className="px-2 py-2 text-right">{(() => { const d = distanceFor(c); return d != null ? `${d.toFixed(1)}mi` : "—"; })()}</td>
                   </tr>
                 );
               })}
@@ -343,7 +382,7 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
                   eventHandlers={{ click: () => c.redfin_url && toggle(c.redfin_url) }}
                 >
                   <Tooltip direction="top" offset={[0, -8]} opacity={1} className="comp-preview-tooltip">
-                    <CompPreviewCard c={c} isSelected={isSelected} />
+                    <CompPreviewCard c={c} isSelected={isSelected} computedDistance={distanceFor(c)} />
                   </Tooltip>
                 </CircleMarker>
               );
