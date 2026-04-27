@@ -394,7 +394,7 @@ export default function CompsPage() {
           </section>
 
           {/* Map view of comps + nearby candidates */}
-          {r.candidates && r.candidates.length > 0 && r.subject.latitude != null && r.subject.longitude != null && (
+          {r.candidates && r.candidates.length > 0 && (
             <section>
               <h3 className="text-xs uppercase tracking-[0.2em] text-[#d4a012] mb-3">
                 Map View ({r.candidates.length} nearby)

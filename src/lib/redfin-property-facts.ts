@@ -15,6 +15,8 @@ export interface PropertyFacts {
   description: string | null;
   renovation_tier: 0 | 1 | 2 | 3 | 4;
   renovation_keywords: string[];
+  latitude: number | null;
+  longitude: number | null;
   fetched_at: string;
 }
 
@@ -183,6 +185,20 @@ function extractNeighborhood(html: string, description: string | null): string |
   return null;
 }
 
+function extractLatLng(html: string): { lat: number | null; lng: number | null } {
+  // Redfin embeds property coords in multiple JSON spots. Take the first plausible Bay-Area-ish pair.
+  const latRe = /"latitude"\s*:\s*"?(-?\d{1,3}\.\d{3,})"?/;
+  const lngRe = /"longitude"\s*:\s*"?(-?\d{1,3}\.\d{3,})"?/;
+  const latM = html.match(latRe);
+  const lngM = html.match(lngRe);
+  const lat = latM ? parseFloat(latM[1]) : NaN;
+  const lng = lngM ? parseFloat(lngM[1]) : NaN;
+  return {
+    lat: Number.isFinite(lat) && Math.abs(lat) <= 90 ? lat : null,
+    lng: Number.isFinite(lng) && Math.abs(lng) <= 180 ? lng : null,
+  };
+}
+
 function inferRenovationTier(description: string | null): { tier: 0 | 1 | 2 | 3 | 4; matched: string[] } {
   if (!description) return { tier: 1, matched: [] };
   const text = description.toLowerCase();
@@ -237,6 +253,7 @@ export async function fetchPropertyFacts(
     const elementary = extractElementarySchoolRating(html);
     const neighborhood = extractNeighborhood(html, description);
     const reno = inferRenovationTier(description);
+    const { lat, lng } = extractLatLng(html);
     return {
       redfin_url,
       neighborhood,
@@ -244,6 +261,8 @@ export async function fetchPropertyFacts(
       description: description ? description.slice(0, 2000) : null,
       renovation_tier: reno.tier,
       renovation_keywords: reno.matched,
+      latitude: lat,
+      longitude: lng,
       fetched_at: new Date().toISOString(),
     };
   } catch (err) {

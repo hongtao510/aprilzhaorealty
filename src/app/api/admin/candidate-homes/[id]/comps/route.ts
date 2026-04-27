@@ -485,6 +485,14 @@ export async function POST(
             subjectGeo.neighborhood = subjectFacts.neighborhood;
             subjectGeo.elementary_school_rating = subjectFacts.elementary_school_rating;
             subjectGeo.renovation_tier = subjectFacts.renovation_tier;
+            // Fallback geocoding: if the candidate_homes row didn't have lat/lng, lift them from the
+            // Redfin property page so the map can plot the red Target Home pin.
+            if (subjectGeo.latitude == null && subjectFacts.latitude != null) {
+              subjectGeo.latitude = subjectFacts.latitude;
+            }
+            if (subjectGeo.longitude == null && subjectFacts.longitude != null) {
+              subjectGeo.longitude = subjectFacts.longitude;
+            }
           }
 
           // Enrich the raw comp pool with facts (only those in the top candidates we fetched).
