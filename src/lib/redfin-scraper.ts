@@ -1,6 +1,6 @@
 import type { RawComp, ScrapeResult } from "./types";
 
-const MAX_COMPS = 20;
+const MAX_COMPS = 60;
 const SCRAPE_TIMEOUT = 20_000; // 20s total for all scraping attempts
 
 // Approximate bounding boxes for zip codes (lat/long).
@@ -8,7 +8,7 @@ const SCRAPE_TIMEOUT = 20_000; // 20s total for all scraping attempts
 // For unknown zips, we geocode on the fly using Redfin's autocomplete.
 const ZIP_BOUNDS: Record<string, { south: number; north: number; west: number; east: number }> = {
   // Pre-cached SF Peninsula + Silicon Valley zips (~2mi radius around center)
-  "94002": { south: 37.495, north: 37.535, west: -122.305, east: -122.245 }, // Belmont
+  "94002": { south: 37.480, north: 37.555, west: -122.325, east: -122.225 }, // Belmont (widened to spill into San Carlos / San Mateo for thin pools)
   "94010": { south: 37.555, north: 37.595, west: -122.380, east: -122.320 }, // Burlingame
   "94014": { south: 37.665, north: 37.705, west: -122.440, east: -122.380 }, // Daly City / Colma
   "94015": { south: 37.660, north: 37.700, west: -122.500, east: -122.440 }, // Daly City

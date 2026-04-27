@@ -60,7 +60,9 @@ export const DEFAULT_CONFIG: ScoringConfig = {
   // Soft city penalty (city_score multiplied into location) is the primary mechanism;
   // hard same-city exclusion is opt-in for users who want strict-only-this-city pools.
   enforceSameCity: false,
-  maxDistanceMiles: 1.5,
+  // Wide enough that no Bay Area submarket pocket gets stripped to nothing; the soft
+  // distance_score still penalises far comps within this cap.
+  maxDistanceMiles: 3.0,
 };
 
 /**
@@ -158,6 +160,8 @@ function parseSoldDate(s: string): Date | null {
 
 /** Minimum comp count after same-city filtering before falling back to no-city-filter. */
 const MIN_SAME_CITY_COMPS = 5;
+/** When the pool is this thin after default filters, progressively relax constraints. */
+const MIN_POOL_FOR_HEALTHY_PICK = 8;
 
 export function scoreComps(
   subject: SubjectGeo,
@@ -165,15 +169,42 @@ export function scoreComps(
   asOfDate: Date,
   config: ScoringConfig = DEFAULT_CONFIG,
 ): ScoredComp[] {
-  const primary = scoreCompsInternal(subject, rawComps, asOfDate, config);
-  // If same-city enforcement stripped the pool too thin, retry without it (still respects all other filters).
+  let primary = scoreCompsInternal(subject, rawComps, asOfDate, config);
+
+  // Fallback 1: same-city enforcement stripped the pool too thin → drop city hard-filter.
   if (
     config.enforceSameCity &&
     subject.city &&
     primary.length < MIN_SAME_CITY_COMPS
   ) {
-    return scoreCompsInternal(subject, rawComps, asOfDate, { ...config, enforceSameCity: false });
+    primary = scoreCompsInternal(subject, rawComps, asOfDate, { ...config, enforceSameCity: false });
   }
+
+  // Fallback 2: pool still too thin → widen distance to 5mi and double the bedbath/era spread.
+  if (primary.length < MIN_POOL_FOR_HEALTHY_PICK) {
+    const widened = scoreCompsInternal(subject, rawComps, asOfDate, {
+      ...config,
+      enforceSameCity: false,
+      maxDistanceMiles: Math.max(config.maxDistanceMiles, 5),
+      bedbathSpread: config.bedbathSpread * 2,
+      eraSpread: config.eraSpread * 2,
+    });
+    if (widened.length > primary.length) primary = widened;
+  }
+
+  // Fallback 3: still thin → also drop property-type hard-filter (will include condos/townhomes).
+  if (primary.length < MIN_POOL_FOR_HEALTHY_PICK) {
+    const noType = scoreCompsInternal(subject, rawComps, asOfDate, {
+      ...config,
+      enforcePropertyType: false,
+      enforceSameCity: false,
+      maxDistanceMiles: Math.max(config.maxDistanceMiles, 5),
+      bedbathSpread: config.bedbathSpread * 2,
+      eraSpread: config.eraSpread * 2,
+    });
+    if (noType.length > primary.length) primary = noType;
+  }
+
   return primary;
 }
 
