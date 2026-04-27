@@ -136,13 +136,33 @@ export default function CompsPage() {
       }
       const data = (await res.json()) as CandidatesResponse;
       setCandidatesData(data);
-      // Pre-select the algorithm's top 8 by similarity score.
-      const top8 = [...data.candidates]
-        .sort((a, b) => (b.total_score ?? 0) - (a.total_score ?? 0))
-        .slice(0, 8)
-        .map((c) => c.redfin_url ?? "")
-        .filter(Boolean);
-      setSelectedUrls(new Set(top8));
+      // Pre-select only the 3 closest comps to the subject so the admin reviews and decides
+      // which of the remaining 9 candidates to add.
+      const sLat = data.subject.latitude;
+      const sLng = data.subject.longitude;
+      const haversine = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+        const R = 3958.7613, toRad = (d: number) => (d * Math.PI) / 180;
+        const dLat = toRad(b.lat - a.lat);
+        const dLng = toRad(b.lng - a.lng);
+        const lat1 = toRad(a.lat), lat2 = toRad(b.lat);
+        const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+        return 2 * R * Math.asin(Math.sqrt(h));
+      };
+      const ranked =
+        sLat != null && sLng != null
+          ? [...data.candidates]
+              .filter((c) => c.latitude != null && c.longitude != null)
+              .map((c) => ({ url: c.redfin_url ?? "", d: haversine({ lat: sLat, lng: sLng }, { lat: c.latitude!, lng: c.longitude! }) }))
+              .filter((x) => x.url)
+              .sort((a, b) => a.d - b.d)
+              .slice(0, 3)
+              .map((x) => x.url)
+          : [...data.candidates]
+              .sort((a, b) => (b.total_score ?? 0) - (a.total_score ?? 0))
+              .slice(0, 3)
+              .map((c) => c.redfin_url ?? "")
+              .filter(Boolean);
+      setSelectedUrls(new Set(ranked));
     } catch (err) {
       setCandidatesError(err instanceof Error ? err.message : "Failed to load candidates");
     } finally {

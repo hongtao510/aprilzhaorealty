@@ -8,7 +8,7 @@ import { scoreComps, type SubjectGeo } from "@/lib/comps/similarity";
 import { fetchPropertyFactsBatch, fetchPropertyFacts } from "@/lib/redfin-property-facts";
 import { computeTrendFromComps, timeAdjustPrice } from "@/lib/comps/trend";
 
-const TOP_N_FOR_PROMPT = 10;
+const TOP_N_FOR_PROMPT = 12;
 /** Fetch property facts for top-K candidates + subject before scoring. */
 const TOP_N_FOR_ENRICHMENT = 12;
 /** Best-effort budget for the parallel fact-fetch step. */

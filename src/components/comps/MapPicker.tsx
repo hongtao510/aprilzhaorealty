@@ -139,11 +139,27 @@ function FitBounds({ points }: { points: [number, number][] }) {
 export default function MapPicker({ subject, candidates, initialSelectedUrls, onEstimateChange, onSelectionChange }: MapPickerProps) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set(initialSelectedUrls));
   const [estimate, setEstimate] = useState<CompsEstimate | null>(null);
+  const [manualComps, setManualComps] = useState<CompHomeWithGeo[]>([]);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualForm, setManualForm] = useState({
+    address: "",
+    sold_price: "",
+    sold_date: "",
+    sqft: "",
+    beds: "",
+    baths: "",
+    lot_sqft: "",
+    latitude: "",
+    longitude: "",
+  });
 
   // Notify parent of selection changes (debounced via React's natural batching).
   useEffect(() => {
     onSelectionChange?.(selected);
   }, [selected, onSelectionChange]);
+
+  // Merge scraped + manual comps into a single working list.
+  const allCandidates = useMemo<CompHomeWithGeo[]>(() => [...candidates, ...manualComps], [candidates, manualComps]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -160,9 +176,10 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
   const points: [number, number][] = useMemo(() => {
     const pts: [number, number][] = [];
     if (subject.latitude != null && subject.longitude != null) pts.push([subject.latitude, subject.longitude]);
-    for (const c of candidates) if (c.latitude != null && c.longitude != null) pts.push([c.latitude, c.longitude]);
+    for (const c of [...candidates, ...manualComps])
+      if (c.latitude != null && c.longitude != null) pts.push([c.latitude, c.longitude]);
     return pts;
-  }, [subject, candidates]);
+  }, [subject, candidates, manualComps]);
 
   // Recompute distance from the same lat/lng pair we plot on the map — guarantees the number
   // shown matches what's on screen, ignoring any stale value baked into the candidate row.
@@ -177,8 +194,18 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
     );
 
   const sortedCandidates = useMemo(
-    () => [...candidates].sort((a, b) => (b.total_score ?? 0) - (a.total_score ?? 0)),
-    [candidates],
+    () => [...allCandidates].sort((a, b) => (b.total_score ?? 0) - (a.total_score ?? 0)),
+    [allCandidates],
+  );
+
+  const closestN = useMemo(
+    () =>
+      [...allCandidates]
+        .map((c) => ({ c, d: distanceFor(c) }))
+        .filter((x) => x.d != null)
+        .sort((a, b) => (a.d ?? Infinity) - (b.d ?? Infinity)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allCandidates, subject.latitude, subject.longitude],
   );
 
   const toggle = (url: string) => {
@@ -194,11 +221,49 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
     setSelected(new Set(sortedCandidates.slice(0, k).map((c) => c.redfin_url).filter(Boolean) as string[]));
   };
 
+  const selectClosestN = (n: number) => {
+    setSelected(new Set(closestN.slice(0, n).map((x) => x.c.redfin_url).filter(Boolean) as string[]));
+  };
+
+  const addManualComp = () => {
+    const sold_price = parseFloat(manualForm.sold_price.replace(/[^0-9.]/g, ""));
+    const sqft = parseFloat(manualForm.sqft.replace(/[^0-9.]/g, ""));
+    if (!manualForm.address || !sold_price || !sqft) return;
+    const lat = parseFloat(manualForm.latitude);
+    const lng = parseFloat(manualForm.longitude);
+    const lot = parseFloat(manualForm.lot_sqft.replace(/[^0-9.]/g, ""));
+    const url = `manual-${Date.now()}`;
+    const newComp: CompHomeWithGeo = {
+      address: manualForm.address,
+      sold_price,
+      sold_date: manualForm.sold_date || "",
+      sqft,
+      beds: parseFloat(manualForm.beds) || 0,
+      baths: parseFloat(manualForm.baths) || 0,
+      lot_sqft: Number.isFinite(lot) ? lot : 0,
+      similarity_score: 0.7,
+      total_score: 0.7,
+      price_per_sqft: sold_price / sqft,
+      reason: "Manually added",
+      redfin_url: url,
+      distance_miles: 0,
+      latitude: Number.isFinite(lat) ? lat : null,
+      longitude: Number.isFinite(lng) ? lng : null,
+      city: null,
+    };
+    setManualComps((prev) => [...prev, newComp]);
+    setSelected((prev) => new Set([...prev, url]));
+    setManualForm({
+      address: "", sold_price: "", sold_date: "", sqft: "", beds: "", baths: "", lot_sqft: "", latitude: "", longitude: "",
+    });
+    setManualOpen(false);
+  };
+
   // Recompute estimate whenever selection changes (debounced).
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
-      const picked = candidates.filter((c) => c.redfin_url && selected.has(c.redfin_url));
+      const picked = allCandidates.filter((c) => c.redfin_url && selected.has(c.redfin_url));
       if (picked.length === 0) {
         setEstimate(null);
         onEstimateChange?.(null);
@@ -234,7 +299,7 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [selected, candidates, subject.sqft, subject.lot_sqft, onEstimateChange]);
+  }, [selected, allCandidates, subject.sqft, subject.lot_sqft, onEstimateChange]);
 
   return (
     <div className="border rounded-lg overflow-hidden bg-white shadow-sm">
@@ -285,10 +350,17 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
           </div>
           <button
             type="button"
+            onClick={() => selectClosestN(3)}
+            className="px-2 py-1 border rounded hover:bg-gray-100"
+          >
+            Pre-pick 3 closest
+          </button>
+          <button
+            type="button"
             onClick={() => selectTopK(8)}
             className="px-2 py-1 border rounded hover:bg-gray-100"
           >
-            Reset to top 8
+            Top 8 by score
           </button>
           <button
             type="button"
@@ -297,61 +369,37 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
           >
             Clear all
           </button>
+          <button
+            type="button"
+            onClick={() => setManualOpen((v) => !v)}
+            className="px-2 py-1 border border-blue-300 bg-blue-50 text-blue-800 rounded hover:bg-blue-100"
+          >
+            + Add manual comp
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 lg:gap-px bg-gray-200">
-        <div className="bg-white max-h-[520px] overflow-auto">
-          <table className="w-full text-xs">
-            <thead className="bg-gray-50 sticky top-0">
-              <tr className="text-left">
-                <th className="px-3 py-2 w-8">✓</th>
-                <th className="px-2 py-2">Address</th>
-                <th className="px-2 py-2 text-right">Price</th>
-                <th className="px-2 py-2 text-right">$/sf</th>
-                <th className="px-2 py-2 text-right">Score</th>
-                <th className="px-2 py-2 text-right">Dist</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedCandidates.map((c) => {
-                const isSelected = c.redfin_url ? selected.has(c.redfin_url) : false;
-                return (
-                  <tr
-                    key={c.redfin_url || c.address}
-                    className={`border-t cursor-pointer ${isSelected ? "bg-blue-50" : "hover:bg-gray-50"}`}
-                    onClick={() => c.redfin_url && toggle(c.redfin_url)}
-                  >
-                    <td className="px-3 py-2">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => c.redfin_url && toggle(c.redfin_url)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </td>
-                    <td className="px-2 py-2 truncate max-w-[200px]">
-                      <div className="font-medium">{c.address.split(",")[0]}</div>
-                      <div className="text-gray-500">{c.city ?? c.address.split(",")[1]?.trim()}</div>
-                    </td>
-                    <td className="px-2 py-2 text-right">{formatMoney(c.sold_price)}</td>
-                    <td className="px-2 py-2 text-right">${Math.round(c.price_per_sqft)}</td>
-                    <td className="px-2 py-2 text-right">{(c.total_score ?? c.similarity_score ?? 0).toFixed(2)}</td>
-                    <td className="px-2 py-2 text-right">{(() => { const d = distanceFor(c); return d != null ? `${d.toFixed(1)}mi` : "—"; })()}</td>
-                  </tr>
-                );
-              })}
-              {sortedCandidates.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-3 py-4 text-center text-gray-500">
-                    No candidates
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+      {manualOpen && (
+        <div className="px-4 py-3 border-b bg-blue-50/40">
+          <div className="text-xs font-semibold text-blue-900 mb-2">Add a comp the algorithm missed</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+            <input className="border rounded px-2 py-1 col-span-2 md:col-span-2" placeholder="Address" value={manualForm.address} onChange={(e) => setManualForm({ ...manualForm, address: e.target.value })} />
+            <input className="border rounded px-2 py-1" placeholder="Sold price ($)" value={manualForm.sold_price} onChange={(e) => setManualForm({ ...manualForm, sold_price: e.target.value })} />
+            <input className="border rounded px-2 py-1" placeholder="Sqft" value={manualForm.sqft} onChange={(e) => setManualForm({ ...manualForm, sqft: e.target.value })} />
+            <input className="border rounded px-2 py-1" placeholder="Beds" value={manualForm.beds} onChange={(e) => setManualForm({ ...manualForm, beds: e.target.value })} />
+            <input className="border rounded px-2 py-1" placeholder="Baths" value={manualForm.baths} onChange={(e) => setManualForm({ ...manualForm, baths: e.target.value })} />
+            <input className="border rounded px-2 py-1" placeholder="Lot sqft (opt)" value={manualForm.lot_sqft} onChange={(e) => setManualForm({ ...manualForm, lot_sqft: e.target.value })} />
+            <input className="border rounded px-2 py-1" placeholder="Sold date YYYY-MM-DD (opt)" value={manualForm.sold_date} onChange={(e) => setManualForm({ ...manualForm, sold_date: e.target.value })} />
+            <input className="border rounded px-2 py-1" placeholder="Lat (opt — to plot on map)" value={manualForm.latitude} onChange={(e) => setManualForm({ ...manualForm, latitude: e.target.value })} />
+            <input className="border rounded px-2 py-1" placeholder="Lng (opt)" value={manualForm.longitude} onChange={(e) => setManualForm({ ...manualForm, longitude: e.target.value })} />
+            <button type="button" onClick={addManualComp} className="col-span-2 md:col-span-1 px-3 py-1 bg-blue-600 text-white rounded text-xs">Add</button>
+            <button type="button" onClick={() => setManualOpen(false)} className="col-span-2 md:col-span-1 px-3 py-1 border rounded text-xs">Cancel</button>
+          </div>
         </div>
+      )}
 
+      <div className="flex flex-col bg-gray-200 gap-px">
+        {/* MAP first (full-width, on top) */}
         <div className="bg-white" style={{ height: 520 }}>
           <MapContainer
             center={center}
@@ -366,7 +414,6 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
             <FitBounds points={points} />
             {subject.latitude != null && subject.longitude != null && (
               <>
-                {/* Outer halo ring — visually unmistakable */}
                 <CircleMarker
                   center={[subject.latitude, subject.longitude]}
                   radius={20}
@@ -400,14 +447,15 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
             {sortedCandidates.map((c) => {
               if (c.latitude == null || c.longitude == null) return null;
               const isSelected = c.redfin_url ? selected.has(c.redfin_url) : false;
+              const isManual = c.redfin_url?.startsWith("manual-");
               return (
                 <CircleMarker
                   key={c.redfin_url || c.address}
                   center={[c.latitude, c.longitude]}
                   radius={isSelected ? 11 : 8}
                   pathOptions={{
-                    color: isSelected ? "#15803d" : "#6b7280",
-                    fillColor: isSelected ? "#22c55e" : "#e5e7eb",
+                    color: isSelected ? (isManual ? "#1e40af" : "#15803d") : "#6b7280",
+                    fillColor: isSelected ? (isManual ? "#3b82f6" : "#22c55e") : "#e5e7eb",
                     fillOpacity: isSelected ? 0.95 : 0.75,
                     weight: isSelected ? 2.5 : 1.5,
                   }}
@@ -420,6 +468,62 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
               );
             })}
           </MapContainer>
+        </div>
+
+        {/* LIST below the map */}
+        <div className="bg-white max-h-[420px] overflow-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-gray-50 sticky top-0">
+              <tr className="text-left">
+                <th className="px-3 py-2 w-8">✓</th>
+                <th className="px-2 py-2">Address</th>
+                <th className="px-2 py-2 text-right">Price</th>
+                <th className="px-2 py-2 text-right">$/sf</th>
+                <th className="px-2 py-2 text-right">Score</th>
+                <th className="px-2 py-2 text-right">Dist</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedCandidates.map((c) => {
+                const isSelected = c.redfin_url ? selected.has(c.redfin_url) : false;
+                const isManual = c.redfin_url?.startsWith("manual-");
+                return (
+                  <tr
+                    key={c.redfin_url || c.address}
+                    className={`border-t cursor-pointer ${isSelected ? (isManual ? "bg-indigo-50" : "bg-blue-50") : "hover:bg-gray-50"}`}
+                    onClick={() => c.redfin_url && toggle(c.redfin_url)}
+                  >
+                    <td className="px-3 py-2">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => c.redfin_url && toggle(c.redfin_url)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </td>
+                    <td className="px-2 py-2 truncate max-w-[260px]">
+                      <div className="font-medium flex items-center gap-1">
+                        {c.address.split(",")[0]}
+                        {isManual && <span className="text-[9px] uppercase tracking-wider px-1 py-0.5 bg-blue-100 text-blue-700 rounded">manual</span>}
+                      </div>
+                      <div className="text-gray-500">{c.city ?? c.address.split(",")[1]?.trim()}</div>
+                    </td>
+                    <td className="px-2 py-2 text-right">{formatMoney(c.sold_price)}</td>
+                    <td className="px-2 py-2 text-right">${Math.round(c.price_per_sqft)}</td>
+                    <td className="px-2 py-2 text-right">{(c.total_score ?? c.similarity_score ?? 0).toFixed(2)}</td>
+                    <td className="px-2 py-2 text-right">{(() => { const d = distanceFor(c); return d != null ? `${d.toFixed(1)}mi` : "—"; })()}</td>
+                  </tr>
+                );
+              })}
+              {sortedCandidates.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-3 py-4 text-center text-gray-500">
+                    No candidates
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
