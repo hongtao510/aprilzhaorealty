@@ -223,14 +223,26 @@ export interface CompsMarketSignals {
   mom_change: string;
 }
 
+export interface CompHomeWithGeo extends CompHome {
+  latitude?: number | null;
+  longitude?: number | null;
+  city?: string | null;
+  total_score?: number;
+}
+
 export interface CompsResult {
   comps: CompHome[];
+  /** All candidate comps surfaced to the UI for manual map-picking. Larger pool than `comps`. */
+  candidates?: CompHomeWithGeo[];
   subject: {
     address: string;
     sqft: number;
     beds: number;
     baths: number;
     lot_sqft: number;
+    latitude?: number | null;
+    longitude?: number | null;
+    city?: string | null;
   };
   estimate: CompsEstimate;
   market_signals: CompsMarketSignals;

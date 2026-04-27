@@ -68,6 +68,28 @@ function extractCity(address: string): string | null {
   return null;
 }
 
+/** Map a ScoredComp into the wire-friendly CompHomeWithGeo shape used by the UI map picker. */
+function toCandidate(c: ScoredComp): import("@/lib/types").CompHomeWithGeo {
+  return {
+    address: c.address,
+    sold_price: c.sold_price,
+    sold_date: c.sold_date,
+    sqft: c.sqft,
+    beds: c.beds,
+    baths: c.baths,
+    lot_sqft: c.lot_sqft ?? 0,
+    similarity_score: c.total_score,
+    price_per_sqft: c.price_per_sqft,
+    reason: "",
+    redfin_url: c.redfin_url,
+    distance_miles: c.distance_miles,
+    latitude: c.latitude ?? null,
+    longitude: c.longitude ?? null,
+    city: c.city ?? null,
+    total_score: c.total_score,
+  };
+}
+
 /** Overwrite Claude's estimate fields with deterministic math computed from the returned comps. */
 function applyDeterministicEstimate(
   result: CompsResult,
@@ -399,6 +421,7 @@ export async function POST(
 
   // --- Pre-score comps deterministically (1A + 1C/1D enrichment, 2D trend) ---
   let scoredComps: ScoredComp[] = [];
+  let candidatesForUI: ScoredComp[] = [];
   let enrichedSubject: SubjectGeo | null = null;
   let monthlyDriftPct = 0;
   const enrichmentInfo = { attempted: 0, fetched: 0, ms: 0 };
@@ -478,10 +501,12 @@ export async function POST(
 
           const finalScored = scoreComps(subjectGeo, adjustedPool, new Date());
           scoredComps = finalScored.slice(0, TOP_N_FOR_PROMPT);
+          candidatesForUI = finalScored.slice(0, 30);
           enrichedSubject = subjectGeo;
         } else {
           console.log("[Enrichment] Budget exceeded — proceeding with base scoring");
           scoredComps = baseScored.slice(0, TOP_N_FOR_PROMPT);
+          candidatesForUI = baseScored.slice(0, 30);
           enrichedSubject = subjectGeo;
         }
       } catch (err) {
@@ -489,6 +514,7 @@ export async function POST(
           `[Enrichment] Failed: ${err instanceof Error ? err.message : String(err)} — proceeding with base scoring`,
         );
         scoredComps = baseScored.slice(0, TOP_N_FOR_PROMPT);
+        candidatesForUI = baseScored.slice(0, 30);
         enrichedSubject = subjectGeo;
       }
 
@@ -544,6 +570,20 @@ export async function POST(
       compsResult,
       typeof subjectSqft === "number" ? subjectSqft : compsResult.subject?.sqft ?? 0,
     );
+    if (candidatesForUI.length > 0) {
+      compsResult = { ...compsResult, candidates: candidatesForUI.map(toCandidate) };
+    }
+    if (enrichedSubject) {
+      compsResult = {
+        ...compsResult,
+        subject: {
+          ...compsResult.subject,
+          latitude: enrichedSubject.latitude,
+          longitude: enrichedSubject.longitude,
+          city: enrichedSubject.city ?? null,
+        },
+      };
+    }
 
     await supabase.from("candidate_comps").delete().eq("candidate_home_id", id);
     await supabase.from("candidate_comps").insert({
@@ -662,6 +702,20 @@ export async function POST(
           compsResult,
           typeof subjectSqft === "number" ? subjectSqft : compsResult.subject?.sqft ?? 0,
         );
+        if (candidatesForUI.length > 0) {
+          compsResult = { ...compsResult, candidates: candidatesForUI.map(toCandidate) };
+        }
+        if (enrichedSubject) {
+          compsResult = {
+            ...compsResult,
+            subject: {
+              ...compsResult.subject,
+              latitude: enrichedSubject.latitude,
+              longitude: enrichedSubject.longitude,
+              city: enrichedSubject.city ?? null,
+            },
+          };
+        }
 
         if (compsResult.estimate) {
           send("log", { message: `Computed estimate from ${compsCount} comps (deterministic)` });
