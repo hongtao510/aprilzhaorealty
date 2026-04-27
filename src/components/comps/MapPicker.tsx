@@ -11,6 +11,8 @@ interface MapPickerProps {
   /** redfin_urls of comps initially selected (typically the algorithm's top 8). */
   initialSelectedUrls: string[];
   onEstimateChange?: (e: CompsEstimate | null) => void;
+  /** Notified whenever the selection changes — parent typically lifts the set into URL params for Phase 2. */
+  onSelectionChange?: (urls: Set<string>) => void;
 }
 
 function formatMoney(n: number): string {
@@ -35,9 +37,14 @@ function FitBounds({ points }: { points: [number, number][] }) {
   return null;
 }
 
-export default function MapPicker({ subject, candidates, initialSelectedUrls, onEstimateChange }: MapPickerProps) {
+export default function MapPicker({ subject, candidates, initialSelectedUrls, onEstimateChange, onSelectionChange }: MapPickerProps) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set(initialSelectedUrls));
   const [estimate, setEstimate] = useState<CompsEstimate | null>(null);
+
+  // Notify parent of selection changes (debounced via React's natural batching).
+  useEffect(() => {
+    onSelectionChange?.(selected);
+  }, [selected, onSelectionChange]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);

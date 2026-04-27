@@ -3,10 +3,27 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import type { CompsResult } from "@/lib/types";
+import type { CompsResult, CompHomeWithGeo } from "@/lib/types";
 
 // Leaflet uses window — load only on the client.
 const MapPicker = dynamic(() => import("@/components/comps/MapPicker"), { ssr: false });
+
+interface CandidatesResponse {
+  candidates: CompHomeWithGeo[];
+  subject: {
+    address: string;
+    sqft: number;
+    beds: number;
+    baths: number;
+    lot_sqft: number;
+    latitude: number | null;
+    longitude: number | null;
+    city: string | null;
+  };
+  scrape_source: string;
+  enrichment: { attempted: number; fetched: number; ms: number };
+  monthly_drift_pct: number;
+}
 
 const MODELS = [
   { value: "claude-opus-4-7", label: "Opus 4.7 (Latest)" },
@@ -46,6 +63,13 @@ export default function CompsPage() {
   const [editSqft, setEditSqft] = useState("");
   const [savingSubject, setSavingSubject] = useState(false);
   const [saveMsg, setSaveMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
+  // Two-phase flow: candidates first, then user-curated AI analysis.
+  const [candidatesData, setCandidatesData] = useState<CandidatesResponse | null>(null);
+  const [candidatesLoading, setCandidatesLoading] = useState(false);
+  const [candidatesError, setCandidatesError] = useState<string | null>(null);
+  const [selectedUrls, setSelectedUrls] = useState<Set<string>>(() => new Set());
+
   const abortRef = useRef<AbortController | null>(null);
   const consoleRef = useRef<HTMLDivElement>(null);
   const rawRef = useRef<HTMLPreElement>(null);
@@ -96,6 +120,36 @@ export default function CompsPage() {
     }
   };
 
+  const fetchCandidates = useCallback(async () => {
+    setCandidatesLoading(true);
+    setCandidatesError(null);
+    setCandidatesData(null);
+    setResult(null);
+    try {
+      const res = await fetch(
+        `/api/admin/candidate-homes/${id}/comps?mode=candidates`,
+        { method: "POST" },
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Request failed (${res.status})`);
+      }
+      const data = (await res.json()) as CandidatesResponse;
+      setCandidatesData(data);
+      // Pre-select the algorithm's top 8 by similarity score.
+      const top8 = [...data.candidates]
+        .sort((a, b) => (b.total_score ?? 0) - (a.total_score ?? 0))
+        .slice(0, 8)
+        .map((c) => c.redfin_url ?? "")
+        .filter(Boolean);
+      setSelectedUrls(new Set(top8));
+    } catch (err) {
+      setCandidatesError(err instanceof Error ? err.message : "Failed to load candidates");
+    } finally {
+      setCandidatesLoading(false);
+    }
+  }, [id]);
+
   const fetchComps = useCallback(
     async (force: boolean) => {
       setLoading(true);
@@ -109,10 +163,16 @@ export default function CompsPage() {
 
       addLog("Starting CMA analysis...");
       addLog(`Model: ${MODELS.find((m) => m.value === model)?.label || model}`);
+      if (selectedUrls.size > 0) {
+        addLog(`Using ${selectedUrls.size} comps you picked on the map`);
+      }
 
       try {
         const params = new URLSearchParams({ model, stream: "true" });
         if (force) params.set("force", "true");
+        if (selectedUrls.size > 0) {
+          params.set("selectedUrls", Array.from(selectedUrls).join(","));
+        }
 
         const res = await fetch(`/api/admin/candidate-homes/${id}/comps?${params}`, {
           method: "POST",
@@ -175,7 +235,7 @@ export default function CompsPage() {
         abortRef.current = null;
       }
     },
-    [id, model, addLog]
+    [id, model, addLog, selectedUrls]
   );
 
   const handleStop = () => {
@@ -185,9 +245,9 @@ export default function CompsPage() {
     }
   };
 
-  // Auto-start on mount
+  // Auto-load candidates on mount; analysis only runs when admin clicks "Run AI Analysis".
   useEffect(() => {
-    fetchComps(false);
+    fetchCandidates();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -224,15 +284,30 @@ export default function CompsPage() {
               Stop
             </button>
           ) : (
-            <button
-              onClick={() => fetchComps(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-neutral-900 text-white text-xs uppercase tracking-wider hover:bg-neutral-700 transition-colors rounded"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Refresh
-            </button>
+            <>
+              <button
+                onClick={() => fetchCandidates()}
+                disabled={candidatesLoading}
+                className="inline-flex items-center gap-2 px-4 py-2 border border-neutral-300 text-neutral-700 text-xs uppercase tracking-wider hover:bg-neutral-100 transition-colors rounded disabled:opacity-50"
+                title="Re-scrape and re-score nearby candidates"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Reload Candidates
+              </button>
+              <button
+                onClick={() => fetchComps(true)}
+                disabled={candidatesLoading || selectedUrls.size === 0}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-neutral-900 text-white text-xs uppercase tracking-wider hover:bg-neutral-700 transition-colors rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                title={selectedUrls.size === 0 ? "Pick at least one comp first" : `Analyze with Claude using ${selectedUrls.size} comps`}
+              >
+                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+                Run AI Analysis ({selectedUrls.size})
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -319,6 +394,35 @@ export default function CompsPage() {
             Try again
           </button>
         </div>
+      )}
+
+      {/* Phase 1: candidate picker — always shown once candidates load */}
+      {candidatesLoading && (
+        <div className="mb-8 px-4 py-6 border border-neutral-200 rounded text-sm text-neutral-600">
+          Loading nearby candidates…
+        </div>
+      )}
+      {candidatesError && (
+        <div className="mb-8 px-4 py-3 border border-red-300 bg-red-50 rounded text-sm text-red-700">
+          Failed to load candidates: {candidatesError}
+        </div>
+      )}
+      {candidatesData && candidatesData.candidates.length > 0 && (
+        <section className="mb-10">
+          <h3 className="text-xs uppercase tracking-[0.2em] text-[#d4a012] mb-3">
+            Step 1 — Pick comps to include ({candidatesData.candidates.length} nearby)
+          </h3>
+          <MapPicker
+            subject={candidatesData.subject}
+            candidates={candidatesData.candidates}
+            initialSelectedUrls={Array.from(selectedUrls)}
+            onSelectionChange={setSelectedUrls}
+          />
+          <p className="mt-3 text-xs text-neutral-500">
+            Toggle pins or rows to refine. The estimate above the AI report uses your final selection.
+            When you&apos;re happy, click <span className="font-semibold">Run AI Analysis</span> in the top right.
+          </p>
+        </section>
       )}
 
       {/* CMA Report */}
@@ -470,26 +574,6 @@ export default function CompsPage() {
               ))}
             </div>
           </section>
-
-          {/* Manual map picker */}
-          {r.candidates && r.candidates.length > 0 && (
-            <section>
-              <h3 className="text-xs uppercase tracking-[0.2em] text-[#d4a012] mb-3">
-                Manual Comp Picker ({r.candidates.length} nearby candidates)
-              </h3>
-              <MapPicker
-                subject={{
-                  address: r.subject.address,
-                  sqft: r.subject.sqft,
-                  lot_sqft: r.subject.lot_sqft,
-                  latitude: r.subject.latitude ?? null,
-                  longitude: r.subject.longitude ?? null,
-                }}
-                candidates={r.candidates}
-                initialSelectedUrls={r.comps.map((c) => c.redfin_url ?? "").filter(Boolean)}
-              />
-            </section>
-          )}
 
           {/* Comps Table */}
           <section>

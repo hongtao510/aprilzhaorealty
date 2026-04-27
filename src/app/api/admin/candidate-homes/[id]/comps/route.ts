@@ -306,6 +306,13 @@ export async function POST(
   const force = searchParams.get("force") === "true";
   const stream = searchParams.get("stream") === "true";
   const modelParam = searchParams.get("model") || "claude-sonnet-4-6";
+  /** "candidates" = Phase 1: scrape + score + enrich, return { candidates, subject } without calling Claude. */
+  const mode = searchParams.get("mode") === "candidates" ? "candidates" : "full";
+  /** Comma-separated redfin URLs the user picked in the map UI; if present, restrict Claude's input to those. */
+  const selectedUrlsRaw = searchParams.get("selectedUrls");
+  const selectedUrlSet = selectedUrlsRaw
+    ? new Set(selectedUrlsRaw.split(",").map((s) => s.trim()).filter(Boolean))
+    : null;
 
   if (!VALID_MODELS.includes(modelParam as ValidModel)) {
     return NextResponse.json(
@@ -338,7 +345,10 @@ export async function POST(
   }
 
   // Check cache (unless force refresh)
-  if (!force) {
+  // mode=candidates and a user-selected subset both bypass the cache — the cached result was
+  // computed against a different (or default) selection.
+  const skipCache = force || mode === "candidates" || (selectedUrlSet && selectedUrlSet.size > 0);
+  if (!skipCache) {
     const cacheThreshold = new Date();
     cacheThreshold.setDate(cacheThreshold.getDate() - CACHE_DAYS);
 
@@ -525,7 +535,40 @@ export async function POST(
       console.log("[Scoring] Subject sqft unknown — falling back to unscored prompt");
     }
   }
-  void enrichedSubject; // reserved for future use
+  // Phase 1: candidates-only — return the scored pool + subject geo for the map picker, no LLM call.
+  if (mode === "candidates") {
+    return NextResponse.json({
+      candidates: candidatesForUI.map(toCandidate),
+      subject: {
+        address,
+        sqft: typeof subjectSqft === "number" ? subjectSqft : 0,
+        beds: typeof subjectBeds === "number" ? subjectBeds : 0,
+        baths: typeof subjectBaths === "number" ? subjectBaths : 0,
+        lot_sqft: typeof subjectLot === "number" ? subjectLot : 0,
+        latitude: enrichedSubject?.latitude ?? null,
+        longitude: enrichedSubject?.longitude ?? null,
+        city: enrichedSubject?.city ?? null,
+      },
+      scrape_source: scrapeResult.source,
+      enrichment: enrichmentInfo,
+      monthly_drift_pct: monthlyDriftPct,
+    });
+  }
+
+  // Phase 2: if the user selected a specific subset on the map, restrict Claude's input to that set
+  // (preserve the user's selection order so the LLM sees them ranked the same way they were chosen).
+  if (selectedUrlSet && selectedUrlSet.size > 0) {
+    const filtered = scoredComps.filter((c) => c.redfin_url && selectedUrlSet.has(c.redfin_url));
+    if (filtered.length > 0) {
+      scoredComps = filtered;
+    } else {
+      // The user picked URLs not present in the top-N pool — re-score the full pool and pull them in.
+      // This handles the case where Phase 1 returned a wider candidate set than TOP_N_FOR_PROMPT.
+      const fallback = candidatesForUI.filter((c) => c.redfin_url && selectedUrlSet.has(c.redfin_url));
+      if (fallback.length > 0) scoredComps = fallback;
+    }
+    console.log(`[Scoring] User-selected subset: ${scoredComps.length} comps`);
+  }
 
   // Build prompt: pre-scored comps if scoring succeeded, otherwise Claude knowledge (unverified)
   const userPrompt =
