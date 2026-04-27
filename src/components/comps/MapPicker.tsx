@@ -5,6 +5,78 @@ import { MapContainer, TileLayer, CircleMarker, Tooltip, useMap } from "react-le
 import "leaflet/dist/leaflet.css";
 import type { CompHomeWithGeo, CompsEstimate } from "@/lib/types";
 
+const RENOVATION_LABEL: Record<number, string> = {
+  0: "Fixer / original",
+  1: "Light updates",
+  2: "Moderate reno",
+  3: "Heavy reno",
+  4: "New construction",
+};
+
+function CompPreviewCard({ c, isSelected }: { c: CompHomeWithGeo; isSelected: boolean }) {
+  const street = c.address.split(",")[0];
+  const cityState = c.address.split(",").slice(1).join(",").trim();
+  return (
+    <div className="text-xs leading-snug min-w-[240px] max-w-[280px]">
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <div>
+          <div className="font-semibold text-sm text-neutral-900">{street}</div>
+          <div className="text-neutral-500">{c.city ?? cityState}</div>
+        </div>
+        <span
+          className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider font-medium ${
+            isSelected ? "bg-green-100 text-green-800" : "bg-neutral-100 text-neutral-600"
+          }`}
+        >
+          {isSelected ? "Included" : "Excluded"}
+        </span>
+      </div>
+
+      <div className="font-semibold text-base text-neutral-900 mb-1">
+        ${c.sold_price.toLocaleString()}
+        <span className="text-neutral-500 font-normal text-xs ml-1">
+          · ${Math.round(c.price_per_sqft).toLocaleString()}/sf
+        </span>
+      </div>
+
+      <div className="text-neutral-700">
+        {c.beds}bd · {c.baths}ba · {c.sqft.toLocaleString()} sqft
+        {c.lot_sqft > 0 ? ` · lot ${c.lot_sqft.toLocaleString()} sqft` : ""}
+        {c.year_built ? ` · built ${c.year_built}` : ""}
+      </div>
+
+      <div className="mt-1 text-neutral-500">
+        Sold {c.sold_date || "—"} · {(c.distance_miles ?? 0).toFixed(2)} mi away
+      </div>
+
+      {(c.neighborhood || c.elementary_school_rating != null || c.renovation_tier != null) && (
+        <div className="mt-1 flex flex-wrap gap-1">
+          {c.neighborhood && (
+            <span className="px-1.5 py-0.5 bg-blue-50 text-blue-800 rounded text-[10px]">
+              {c.neighborhood}
+            </span>
+          )}
+          {c.elementary_school_rating != null && (
+            <span className="px-1.5 py-0.5 bg-amber-50 text-amber-800 rounded text-[10px]">
+              School {c.elementary_school_rating}/10
+            </span>
+          )}
+          {c.renovation_tier != null && (
+            <span className="px-1.5 py-0.5 bg-purple-50 text-purple-800 rounded text-[10px]">
+              {RENOVATION_LABEL[c.renovation_tier] ?? `Reno ${c.renovation_tier}`}
+            </span>
+          )}
+        </div>
+      )}
+
+      <div className="mt-2 pt-2 border-t border-neutral-200 flex items-center justify-between text-[10px] text-neutral-500">
+        <span>Similarity {(c.total_score ?? c.similarity_score ?? 0).toFixed(2)}</span>
+        <span className="text-neutral-700 font-medium">Click to {isSelected ? "exclude" : "include"}</span>
+      </div>
+    </div>
+  );
+}
+
 interface MapPickerProps {
   subject: { address: string; sqft: number; lot_sqft: number; latitude?: number | null; longitude?: number | null };
   candidates: CompHomeWithGeo[];
@@ -127,14 +199,39 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
 
   return (
     <div className="border rounded-lg overflow-hidden bg-white shadow-sm">
-      <div className="px-4 py-3 border-b bg-gray-50 flex items-center justify-between gap-4">
+      <style jsx global>{`
+        .leaflet-tooltip.comp-preview-tooltip {
+          background: white;
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          padding: 10px 12px;
+          box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+          white-space: normal;
+          max-width: 300px;
+        }
+        .leaflet-tooltip.comp-preview-tooltip:before {
+          border-top-color: white;
+        }
+      `}</style>
+      <div className="px-4 py-3 border-b bg-gray-50 flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <div className="font-semibold text-sm">Manual comp picker</div>
+          <div className="font-semibold text-sm">Comp picker</div>
           <div className="text-xs text-gray-600">
-            {selected.size} of {candidates.length} selected · click pins or rows to toggle
+            {selected.size} of {candidates.length} selected · hover a pin to preview · click to toggle
           </div>
         </div>
-        <div className="flex gap-2 text-xs">
+        <div className="flex items-center gap-3 text-xs">
+          <div className="flex items-center gap-3 text-gray-600 mr-2">
+            <span className="inline-flex items-center gap-1">
+              <span className="w-3 h-3 rounded-full bg-blue-500 border-2 border-blue-700 inline-block" /> Subject
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="w-3 h-3 rounded-full bg-green-500 border-2 border-green-700 inline-block" /> Included
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="w-3 h-3 rounded-full bg-gray-200 border-2 border-gray-500 inline-block" /> Excluded
+            </span>
+          </div>
           <button
             type="button"
             onClick={() => selectTopK(8)}
@@ -236,24 +333,17 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
                 <CircleMarker
                   key={c.redfin_url || c.address}
                   center={[c.latitude, c.longitude]}
-                  radius={isSelected ? 8 : 6}
+                  radius={isSelected ? 11 : 8}
                   pathOptions={{
-                    color: isSelected ? "#15803d" : "#9ca3af",
-                    fillColor: isSelected ? "#22c55e" : "#d1d5db",
-                    fillOpacity: 0.85,
-                    weight: 2,
+                    color: isSelected ? "#15803d" : "#6b7280",
+                    fillColor: isSelected ? "#22c55e" : "#e5e7eb",
+                    fillOpacity: isSelected ? 0.95 : 0.75,
+                    weight: isSelected ? 2.5 : 1.5,
                   }}
                   eventHandlers={{ click: () => c.redfin_url && toggle(c.redfin_url) }}
                 >
-                  <Tooltip>
-                    <div className="text-xs">
-                      <strong>{c.address.split(",")[0]}</strong>
-                      <br />
-                      {formatMoney(c.sold_price)} · {c.sqft} sf · ${Math.round(c.price_per_sqft)}/sf
-                      <br />
-                      score {(c.total_score ?? c.similarity_score ?? 0).toFixed(2)}
-                      {c.city ? ` · ${c.city}` : ""}
-                    </div>
+                  <Tooltip direction="top" offset={[0, -8]} opacity={1} className="comp-preview-tooltip">
+                    <CompPreviewCard c={c} isSelected={isSelected} />
                   </Tooltip>
                 </CircleMarker>
               );

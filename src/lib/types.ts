@@ -228,6 +228,11 @@ export interface CompHomeWithGeo extends CompHome {
   longitude?: number | null;
   city?: string | null;
   total_score?: number;
+  // Optional richer signals — populated when the per-property enrichment ran
+  year_built?: number | null;
+  neighborhood?: string | null;
+  elementary_school_rating?: number | null;
+  renovation_tier?: 0 | 1 | 2 | 3 | 4 | null;
 }
 
 export interface CompsResult {

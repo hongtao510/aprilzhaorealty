@@ -87,6 +87,10 @@ function toCandidate(c: ScoredComp): import("@/lib/types").CompHomeWithGeo {
     longitude: c.longitude ?? null,
     city: c.city ?? null,
     total_score: c.total_score,
+    year_built: c.year_built ?? null,
+    neighborhood: c.neighborhood ?? null,
+    elementary_school_rating: c.elementary_school_rating ?? null,
+    renovation_tier: c.renovation_tier ?? null,
   };
 }
 
