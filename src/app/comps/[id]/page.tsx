@@ -2,7 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import type { CompsResult } from "@/lib/types";
+
+const MapPicker = dynamic(() => import("@/components/comps/MapPicker"), { ssr: false });
 
 const MODELS = [
   { value: "claude-opus-4-7", label: "Opus 4.7 (Latest)" },
@@ -381,6 +384,26 @@ export default function CompsPage() {
               ))}
             </div>
           </section>
+
+          {/* Map view of comps + nearby candidates */}
+          {r.candidates && r.candidates.length > 0 && r.subject.latitude != null && r.subject.longitude != null && (
+            <section>
+              <h3 className="text-xs uppercase tracking-[0.2em] text-[#d4a012] mb-3">
+                Map View ({r.candidates.length} nearby)
+              </h3>
+              <MapPicker
+                subject={{
+                  address: r.subject.address,
+                  sqft: r.subject.sqft,
+                  lot_sqft: r.subject.lot_sqft,
+                  latitude: r.subject.latitude ?? null,
+                  longitude: r.subject.longitude ?? null,
+                }}
+                candidates={r.candidates}
+                initialSelectedUrls={r.comps.map((c) => c.redfin_url ?? "").filter(Boolean)}
+              />
+            </section>
+          )}
 
           {/* Comps Table */}
           <section>
