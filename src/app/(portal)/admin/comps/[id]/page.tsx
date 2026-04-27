@@ -259,7 +259,19 @@ export default function CompsPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <p className="text-[#d4a012] text-xs uppercase tracking-[0.3em] mb-2">Comparative Market Analysis</p>
-          <h1 className="font-serif text-3xl text-neutral-900">Find Comps</h1>
+          <h1 className="font-serif text-3xl text-neutral-900">
+            {candidatesData?.subject?.address || result?.subject?.address || "Find Comps"}
+          </h1>
+          {(candidatesData?.subject || result?.subject) && (
+            <p className="text-sm text-neutral-500 mt-1">
+              {(candidatesData?.subject?.beds ?? result?.subject?.beds)} bd ·{" "}
+              {(candidatesData?.subject?.baths ?? result?.subject?.baths)} ba ·{" "}
+              {(candidatesData?.subject?.sqft ?? result?.subject?.sqft)?.toLocaleString()} sqft
+              {(candidatesData?.subject?.lot_sqft ?? result?.subject?.lot_sqft)
+                ? ` · lot ${(candidatesData?.subject?.lot_sqft ?? result?.subject?.lot_sqft)?.toLocaleString()} sqft`
+                : ""}
+            </p>
+          )}
           <div className="w-16 h-0.5 bg-[#d4a012] mt-4" />
         </div>
         <div className="flex items-center gap-3">

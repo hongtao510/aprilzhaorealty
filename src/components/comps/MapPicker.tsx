@@ -251,6 +251,18 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
         .leaflet-tooltip.comp-preview-tooltip:before {
           border-top-color: white;
         }
+        .leaflet-tooltip.comp-subject-tooltip {
+          background: white;
+          border: 2px solid #dc2626;
+          border-radius: 6px;
+          padding: 4px 8px;
+          box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+          font-size: 12px;
+          white-space: normal;
+        }
+        .leaflet-tooltip.comp-subject-tooltip:before {
+          border-top-color: #dc2626;
+        }
       `}</style>
       <div className="px-4 py-3 border-b bg-gray-50 flex items-center justify-between gap-4 flex-wrap">
         <div>
@@ -262,7 +274,7 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
         <div className="flex items-center gap-3 text-xs">
           <div className="flex items-center gap-3 text-gray-600 mr-2">
             <span className="inline-flex items-center gap-1">
-              <span className="w-3 h-3 rounded-full bg-blue-500 border-2 border-blue-700 inline-block" /> Subject
+              <span className="w-3 h-3 rounded-full bg-red-600 border-2 border-red-800 inline-block" /> Target home
             </span>
             <span className="inline-flex items-center gap-1">
               <span className="w-3 h-3 rounded-full bg-green-500 border-2 border-green-700 inline-block" /> Included
@@ -353,17 +365,37 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
             />
             <FitBounds points={points} />
             {subject.latitude != null && subject.longitude != null && (
-              <CircleMarker
-                center={[subject.latitude, subject.longitude]}
-                radius={9}
-                pathOptions={{ color: "#1d4ed8", fillColor: "#3b82f6", fillOpacity: 1, weight: 2 }}
-              >
-                <Tooltip permanent direction="top" offset={[0, -10]}>
-                  <strong>Subject</strong>
-                  <br />
-                  {subject.address.split(",")[0]}
-                </Tooltip>
-              </CircleMarker>
+              <>
+                {/* Outer halo ring — visually unmistakable */}
+                <CircleMarker
+                  center={[subject.latitude, subject.longitude]}
+                  radius={20}
+                  pathOptions={{
+                    color: "#dc2626",
+                    fillColor: "#dc2626",
+                    fillOpacity: 0.12,
+                    weight: 3,
+                    dashArray: "4 4",
+                  }}
+                  interactive={false}
+                />
+                <CircleMarker
+                  center={[subject.latitude, subject.longitude]}
+                  radius={11}
+                  pathOptions={{
+                    color: "#991b1b",
+                    fillColor: "#dc2626",
+                    fillOpacity: 1,
+                    weight: 3,
+                  }}
+                >
+                  <Tooltip permanent direction="top" offset={[0, -12]} className="comp-subject-tooltip">
+                    <strong style={{ color: "#dc2626" }}>★ Target Home</strong>
+                    <br />
+                    {subject.address.split(",")[0]}
+                  </Tooltip>
+                </CircleMarker>
+              </>
             )}
             {sortedCandidates.map((c) => {
               if (c.latitude == null || c.longitude == null) return null;
