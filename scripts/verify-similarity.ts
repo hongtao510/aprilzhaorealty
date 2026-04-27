@@ -88,12 +88,21 @@ function check(name: string, cond: boolean, detail?: unknown) {
     sqft: 1000, beds: 3, baths: 2, lot_sqft: 5000,
     latitude: 37.5, longitude: -122.3, property_type: "Single Family",
   };
-  const comps: RawComp[] = [
-    { address: "sfr", sold_price: 1_000_000, sold_date: "2026-04-01", sqft: 1000, beds: 3, baths: 2, lot_sqft: 5000, redfin_url: "", latitude: 37.5, longitude: -122.3, property_type: "Single Family" },
-    { address: "condo", sold_price: 1_000_000, sold_date: "2026-04-01", sqft: 1000, beds: 3, baths: 2, lot_sqft: 5000, redfin_url: "", latitude: 37.5, longitude: -122.3, property_type: "Condo/Co-op" },
-  ];
-  const scored = scoreComps(subject, comps, new Date("2026-04-26"));
-  check("property-type filter excludes condos", scored.length === 1 && scored[0].address === "sfr");
+  // Need >= MIN_POOL_FOR_HEALTHY_PICK SFRs so the thin-pool fallback that drops
+  // enforcePropertyType doesn't trigger.
+  const sfrs: RawComp[] = Array.from({ length: 10 }).map((_, i) => ({
+    address: `sfr-${i}`,
+    sold_price: 1_000_000 + i * 1000,
+    sold_date: "2026-04-01",
+    sqft: 1000, beds: 3, baths: 2, lot_sqft: 5000,
+    redfin_url: `sfr-${i}`,
+    latitude: 37.5 + i * 0.0001,
+    longitude: -122.3,
+    property_type: "Single Family",
+  }));
+  const condo: RawComp = { address: "condo", sold_price: 1_500_000, sold_date: "2026-04-01", sqft: 1000, beds: 3, baths: 2, lot_sqft: 5000, redfin_url: "condo", latitude: 37.5, longitude: -122.3, property_type: "Condo/Co-op" };
+  const scored = scoreComps(subject, [...sfrs, condo], new Date("2026-04-26"));
+  check("property-type filter excludes condos when pool is healthy", !scored.some((c) => c.address === "condo"), scored.map((c) => c.address));
 }
 
 // --- Distance score decay ---
