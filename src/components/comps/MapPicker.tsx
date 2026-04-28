@@ -193,10 +193,56 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
       c.latitude != null && c.longitude != null ? { lat: c.latitude, lng: c.longitude } : null,
     );
 
-  const sortedCandidates = useMemo(
-    () => [...allCandidates].sort((a, b) => (b.total_score ?? 0) - (a.total_score ?? 0)),
-    [allCandidates],
-  );
+  type SortKey = "selected" | "address" | "price" | "ppsf" | "score" | "distance";
+  const [sortKey, setSortKey] = useState<SortKey>("score");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  const onSort = (k: SortKey) => {
+    if (k === sortKey) setSortDir(sortDir === "asc" ? "desc" : "asc");
+    else {
+      setSortKey(k);
+      // Sensible default direction per column.
+      setSortDir(k === "address" || k === "distance" ? "asc" : "desc");
+    }
+  };
+
+  const sortIndicator = (k: SortKey) => (sortKey === k ? (sortDir === "asc" ? " ▲" : " ▼") : "");
+
+  const sortedCandidates = useMemo(() => {
+    const list = [...allCandidates];
+    const sign = sortDir === "asc" ? 1 : -1;
+    list.sort((a, b) => {
+      let av: number | string = 0;
+      let bv: number | string = 0;
+      switch (sortKey) {
+        case "selected":
+          av = a.redfin_url && selected.has(a.redfin_url) ? 1 : 0;
+          bv = b.redfin_url && selected.has(b.redfin_url) ? 1 : 0;
+          break;
+        case "address":
+          av = (a.address.split(",")[0] || "").toLowerCase();
+          bv = (b.address.split(",")[0] || "").toLowerCase();
+          break;
+        case "price":
+          av = a.sold_price; bv = b.sold_price; break;
+        case "ppsf":
+          av = a.price_per_sqft; bv = b.price_per_sqft; break;
+        case "score":
+          av = a.total_score ?? a.similarity_score ?? 0;
+          bv = b.total_score ?? b.similarity_score ?? 0;
+          break;
+        case "distance":
+          av = distanceFor(a) ?? Infinity;
+          bv = distanceFor(b) ?? Infinity;
+          break;
+      }
+      if (av < bv) return -1 * sign;
+      if (av > bv) return 1 * sign;
+      return 0;
+    });
+    return list;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allCandidates, sortKey, sortDir, selected, subject.latitude, subject.longitude]);
 
   const closestN = useMemo(
     () =>
@@ -474,13 +520,13 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
         <div className="bg-white max-h-[420px] overflow-auto">
           <table className="w-full text-xs">
             <thead className="bg-gray-50 sticky top-0">
-              <tr className="text-left">
-                <th className="px-3 py-2 w-8">✓</th>
-                <th className="px-2 py-2">Address</th>
-                <th className="px-2 py-2 text-right">Price</th>
-                <th className="px-2 py-2 text-right">$/sf</th>
-                <th className="px-2 py-2 text-right">Score</th>
-                <th className="px-2 py-2 text-right">Dist</th>
+              <tr className="text-left select-none">
+                <th className="px-3 py-2 w-8 cursor-pointer hover:bg-gray-100" onClick={() => onSort("selected")} title="Sort by selection">✓{sortIndicator("selected")}</th>
+                <th className="px-2 py-2 cursor-pointer hover:bg-gray-100" onClick={() => onSort("address")}>Address{sortIndicator("address")}</th>
+                <th className="px-2 py-2 text-right cursor-pointer hover:bg-gray-100" onClick={() => onSort("price")}>Price{sortIndicator("price")}</th>
+                <th className="px-2 py-2 text-right cursor-pointer hover:bg-gray-100" onClick={() => onSort("ppsf")}>$/sf{sortIndicator("ppsf")}</th>
+                <th className="px-2 py-2 text-right cursor-pointer hover:bg-gray-100" onClick={() => onSort("score")}>Score{sortIndicator("score")}</th>
+                <th className="px-2 py-2 text-right cursor-pointer hover:bg-gray-100" onClick={() => onSort("distance")}>Dist{sortIndicator("distance")}</th>
               </tr>
             </thead>
             <tbody>
