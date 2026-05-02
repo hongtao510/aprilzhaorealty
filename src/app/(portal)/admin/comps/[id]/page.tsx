@@ -445,7 +445,12 @@ export default function CompsPage() {
             Step 1 — Pick comps to include ({candidatesData.candidates.length} nearby)
           </h3>
           <MapPicker
-            subject={candidatesData.subject}
+            subject={{
+              ...candidatesData.subject,
+              beds: candidatesData.subject.beds,
+              baths: candidatesData.subject.baths,
+              year_built: (candidatesData.subject as { year_built?: number | null }).year_built ?? null,
+            }}
             candidates={candidatesData.candidates}
             initialSelectedUrls={Array.from(selectedUrls)}
             onSelectionChange={setSelectedUrls}

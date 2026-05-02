@@ -406,6 +406,8 @@ export default function CompsPage() {
                   lot_sqft: r.subject.lot_sqft,
                   latitude: r.subject.latitude ?? null,
                   longitude: r.subject.longitude ?? null,
+                  beds: r.subject.beds,
+                  baths: r.subject.baths,
                 }}
                 candidates={r.candidates}
                 initialSelectedUrls={r.comps.map((c) => c.redfin_url ?? "").filter(Boolean)}

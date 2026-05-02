@@ -105,7 +105,7 @@ function CompPreviewCard({
 }
 
 interface MapPickerProps {
-  subject: { address: string; sqft: number; lot_sqft: number; latitude?: number | null; longitude?: number | null };
+  subject: { address: string; sqft: number; lot_sqft: number; latitude?: number | null; longitude?: number | null; beds?: number; baths?: number; year_built?: number | null };
   candidates: CompHomeWithGeo[];
   /** redfin_urls of comps initially selected (typically the algorithm's top 8). */
   initialSelectedUrls: string[];
@@ -160,6 +160,14 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
 
   // Merge scraped + manual comps into a single working list.
   const allCandidates = useMemo<CompHomeWithGeo[]>(() => [...candidates, ...manualComps], [candidates, manualComps]);
+
+  // Subject specs used for the spec-mismatch highlighting in the picker rows.
+  const subjectSpecs = {
+    bd: subject.beds ?? 0,
+    ba: subject.baths ?? 0,
+    sqft: subject.sqft ?? 0,
+    year: subject.year_built ?? null,
+  };
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -193,7 +201,7 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
       c.latitude != null && c.longitude != null ? { lat: c.latitude, lng: c.longitude } : null,
     );
 
-  type SortKey = "selected" | "address" | "price" | "ppsf" | "score" | "distance";
+  type SortKey = "selected" | "address" | "specs" | "price" | "ppsf" | "score" | "distance";
   const [sortKey, setSortKey] = useState<SortKey>("score");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
@@ -223,6 +231,9 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
           av = (a.address.split(",")[0] || "").toLowerCase();
           bv = (b.address.split(",")[0] || "").toLowerCase();
           break;
+        case "specs":
+          // Sort by sqft as the dominant comp similarity signal.
+          av = a.sqft; bv = b.sqft; break;
         case "price":
           av = a.sold_price; bv = b.sold_price; break;
         case "ppsf":
@@ -523,6 +534,7 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
               <tr className="text-left select-none">
                 <th className="px-3 py-2 w-8 cursor-pointer hover:bg-gray-100" onClick={() => onSort("selected")} title="Sort by selection">✓{sortIndicator("selected")}</th>
                 <th className="px-2 py-2 cursor-pointer hover:bg-gray-100" onClick={() => onSort("address")}>Address{sortIndicator("address")}</th>
+                <th className="px-2 py-2 cursor-pointer hover:bg-gray-100" onClick={() => onSort("specs")}>Bd/Ba · Sqft · Yr{sortIndicator("specs")}</th>
                 <th className="px-2 py-2 text-right cursor-pointer hover:bg-gray-100" onClick={() => onSort("price")}>Price{sortIndicator("price")}</th>
                 <th className="px-2 py-2 text-right cursor-pointer hover:bg-gray-100" onClick={() => onSort("ppsf")}>$/sf{sortIndicator("ppsf")}</th>
                 <th className="px-2 py-2 text-right cursor-pointer hover:bg-gray-100" onClick={() => onSort("score")}>Score{sortIndicator("score")}</th>
@@ -530,6 +542,22 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
               </tr>
             </thead>
             <tbody>
+              {/* Subject reference row — shown for at-a-glance comparison only */}
+              <tr className="border-t bg-red-50/50">
+                <td className="px-3 py-2 text-red-600">★</td>
+                <td className="px-2 py-2 truncate max-w-[220px]">
+                  <div className="font-semibold text-red-700">{subject.address.split(",")[0]}</div>
+                  <div className="text-red-700/70 text-[10px] uppercase tracking-wider">Target home</div>
+                </td>
+                <td className="px-2 py-2 whitespace-nowrap text-red-700 font-medium">
+                  {subject.beds ?? "?"}bd/{subject.baths ?? "?"}ba · {subject.sqft?.toLocaleString() || "?"}sf
+                  {subject.year_built ? ` · ${subject.year_built}` : ""}
+                </td>
+                <td className="px-2 py-2 text-right text-gray-400">—</td>
+                <td className="px-2 py-2 text-right text-gray-400">—</td>
+                <td className="px-2 py-2 text-right text-gray-400">—</td>
+                <td className="px-2 py-2 text-right text-gray-400">—</td>
+              </tr>
               {sortedCandidates.map((c) => {
                 const isSelected = c.redfin_url ? selected.has(c.redfin_url) : false;
                 const isManual = c.redfin_url?.startsWith("manual-");
@@ -547,12 +575,29 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
                         onClick={(e) => e.stopPropagation()}
                       />
                     </td>
-                    <td className="px-2 py-2 truncate max-w-[260px]">
+                    <td className="px-2 py-2 truncate max-w-[220px]">
                       <div className="font-medium flex items-center gap-1">
                         {c.address.split(",")[0]}
                         {isManual && <span className="text-[9px] uppercase tracking-wider px-1 py-0.5 bg-blue-100 text-blue-700 rounded">manual</span>}
                       </div>
                       <div className="text-gray-500">{c.city ?? c.address.split(",")[1]?.trim()}</div>
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      <span className={c.beds && c.baths && Math.abs(c.beds + c.baths - (subjectSpecs.bd + subjectSpecs.ba)) <= 1 ? "" : "text-amber-700"}>
+                        {c.beds || "?"}bd/{c.baths || "?"}ba
+                      </span>
+                      <span className="text-gray-400"> · </span>
+                      <span className={c.sqft && Math.abs(c.sqft - subjectSpecs.sqft) / Math.max(subjectSpecs.sqft, 1) <= 0.20 ? "" : "text-amber-700"}>
+                        {c.sqft ? c.sqft.toLocaleString() : "?"}sf
+                      </span>
+                      {c.year_built && (
+                        <>
+                          <span className="text-gray-400"> · </span>
+                          <span className={Math.abs(c.year_built - (subjectSpecs.year || c.year_built)) <= 20 ? "text-gray-500" : "text-amber-700"}>
+                            {c.year_built}
+                          </span>
+                        </>
+                      )}
                     </td>
                     <td className="px-2 py-2 text-right">{formatMoney(c.sold_price)}</td>
                     <td className="px-2 py-2 text-right">${Math.round(c.price_per_sqft)}</td>
@@ -563,7 +608,7 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
               })}
               {sortedCandidates.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-3 py-4 text-center text-gray-500">
+                  <td colSpan={7} className="px-3 py-4 text-center text-gray-500">
                     No candidates
                   </td>
                 </tr>
