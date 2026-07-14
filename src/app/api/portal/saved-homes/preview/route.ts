@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { fetchListingHtml, ListingUrlError } from "@/lib/listing-url";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -11,31 +12,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { url } = await request.json();
-
-  if (!url) {
-    return NextResponse.json({ error: "url is required" }, { status: 400 });
-  }
+  const { url } = await request.json().catch(() => ({}));
 
   try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      },
-      signal: AbortSignal.timeout(5000),
-    });
-
-    if (!response.ok) {
-      return NextResponse.json({
-        title: null,
-        image_url: null,
-        address: null,
-        price: null,
-      });
-    }
-
-    const html = await response.text();
+    const { html } = await fetchListingHtml(url, 5000);
 
     const ogTitle = html.match(
       /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i
@@ -79,12 +59,10 @@ export async function POST(request: Request) {
       address,
       price,
     });
-  } catch {
-    return NextResponse.json({
-      title: null,
-      image_url: null,
-      address: null,
-      price: null,
-    });
+  } catch (error) {
+    const message = error instanceof ListingUrlError
+      ? error.message
+      : "Unable to retrieve the listing page";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }

@@ -13,6 +13,7 @@ export default function SearchPage() {
   const [error, setError] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const previewRequestRef = useRef(0);
 
   useEffect(() => {
     return () => {
@@ -21,10 +22,10 @@ export default function SearchPage() {
     };
   }, []);
 
-  const fetchPreview = useCallback(async (inputUrl: string) => {
+  const fetchPreview = useCallback(async (inputUrl: string, requestId: number) => {
     if (!inputUrl.startsWith("http")) return;
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setLoadingPreview(true);
     setError("");
     try {
@@ -32,30 +33,39 @@ export default function SearchPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: inputUrl }),
-        signal: abortRef.current.signal,
+        signal: controller.signal,
       });
-      if (res.ok) {
-        const data = await res.json();
-        setPreview(data);
+      const data = await res.json();
+      if (previewRequestRef.current !== requestId) return;
+      if (!res.ok) {
+        setError(data.error || "Unable to preview this listing");
+        return;
       }
+      setPreview(data);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
     } finally {
-      setLoadingPreview(false);
+      if (previewRequestRef.current === requestId) {
+        setLoadingPreview(false);
+      }
     }
   }, []);
 
   function handleUrlChange(value: string) {
+    const requestId = previewRequestRef.current + 1;
+    previewRequestRef.current = requestId;
+    abortRef.current?.abort();
     setUrl(value);
     setSaved(false);
     setError("");
     setPreview(null);
+    setLoadingPreview(false);
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     if (value.startsWith("http")) {
       debounceRef.current = setTimeout(() => {
-        fetchPreview(value);
+        fetchPreview(value, requestId);
       }, 800);
     }
   }
@@ -155,7 +165,7 @@ export default function SearchPage() {
               type="url"
               value={url}
               onChange={(e) => handleUrlChange(e.target.value)}
-              placeholder="Paste a Redfin, Zillow, or other listing URL..."
+              placeholder="Paste a Redfin, Zillow, or Realtor.com URL..."
               className="w-full border border-neutral-200 px-4 py-3 text-sm text-neutral-900 placeholder-neutral-300 focus:outline-none focus:border-[#d4a012] transition-colors"
             />
           </div>

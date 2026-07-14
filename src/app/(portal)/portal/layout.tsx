@@ -11,17 +11,26 @@ export default function ClientPortalLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { profile, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   const router = useRouter();
+  const hasPortalAccess =
+    !!user && (profile?.role === "client" || profile?.role === "admin");
 
   // Middleware already verified auth — this is a fallback safety check
   useEffect(() => {
-    if (!loading && !profile) {
+    if (!loading && !hasPortalAccess) {
       router.push("/login");
     }
-  }, [loading, profile, router]);
+  }, [hasPortalAccess, loading, router]);
 
-  // Render layout immediately — middleware guarantees access
+  if (loading || !hasPortalAccess) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center px-6">
+        <p className="text-sm text-neutral-500">Checking access...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-white">
       <PortalHeader />

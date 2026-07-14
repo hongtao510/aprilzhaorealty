@@ -9,7 +9,7 @@ type ActivePanel = null | "route" | "email";
 
 /** Extract a clean street address from scraped listing text. */
 function extractRouteAddress(raw: string): string {
-  let cleaned = raw
+  const cleaned = raw
     .replace(/[-–—]?\s*\d+\.?\d*\s*beds?\s*[/|,]\s*\d+\.?\d*\s*baths?.*/i, "")
     .replace(/[-–—]?\s*[\d,]+\s*sq\.?\s*ft\.?.*/i, "")
     .trim()
@@ -607,7 +607,7 @@ export default function CandidatesPage() {
           <div className="bg-white w-full max-w-md p-6">
             <h2 className="font-serif text-xl text-neutral-900 mb-4">Add Listing Manually</h2>
             <p className="text-sm text-neutral-500 mb-4">
-              Paste a Redfin, Zillow, or any listing URL to add it as a candidate.
+              Paste a Redfin, Zillow, or Realtor.com listing URL to add it as a candidate.
             </p>
             <input
               type="url"

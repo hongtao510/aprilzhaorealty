@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { fetchListingHtml, validateListingUrl } from "@/lib/listing-url";
 
 async function verifyAdmin() {
   const supabase = await createClient();
@@ -58,17 +59,77 @@ export async function POST(request: NextRequest) {
   const { supabase, error, status } = await verifyAdmin();
   if (error) return NextResponse.json({ error }, { status: status! });
 
-  const { url, beds: manualBeds, baths: manualBaths, sqft: manualSqft } = await request.json();
+  const body = await request.json();
+  const { listingId, url, beds: manualBeds, baths: manualBaths, sqft: manualSqft } = body;
 
-  if (!url) {
-    return NextResponse.json({ error: "url is required" }, { status: 400 });
+  // Internal listing search adds candidates from data we already collected.
+  // This avoids another external scrape and keeps the candidate record complete.
+  if (typeof listingId === "string") {
+    const { data: listing, error: listingError } = await supabase
+      .from("redfin_listings")
+      .select("redfin_url, address, city, state, zip, price, beds, baths, sqft, image_url, property_type")
+      .eq("id", listingId)
+      .eq("status", "active")
+      .single();
+
+    if (listingError || !listing) {
+      return NextResponse.json({ error: "Active listing not found" }, { status: 404 });
+    }
+
+    const { data: existing } = await supabase
+      .from("candidate_homes")
+      .select("id")
+      .eq("url", listing.redfin_url)
+      .maybeSingle();
+
+    if (existing) {
+      return NextResponse.json({ error: "This listing is already in candidates" }, { status: 409 });
+    }
+
+    const address = [listing.address, listing.city, listing.state, listing.zip]
+      .filter(Boolean)
+      .join(", ");
+    const { data, error: insertError } = await supabase
+      .from("candidate_homes")
+      .insert({
+        url: listing.redfin_url,
+        title: address,
+        image_url: listing.image_url,
+        address,
+        price: listing.price ? `$${Number(listing.price).toLocaleString("en-US")}` : null,
+        price_numeric: listing.price,
+        beds: listing.beds,
+        baths: listing.baths,
+        sqft: listing.sqft,
+        property_type: listing.property_type,
+        status: "new",
+        source: "redfin",
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      return NextResponse.json({ error: insertError.message }, { status: 500 });
+    }
+
+    return NextResponse.json(data, { status: 201 });
+  }
+
+  let listingUrl: string;
+  try {
+    listingUrl = validateListingUrl(url).toString();
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Invalid listing URL" },
+      { status: 400 }
+    );
   }
 
   // Check for duplicate
   const { data: existing } = await supabase
     .from("candidate_homes")
     .select("id")
-    .eq("url", url)
+    .eq("url", listingUrl)
     .maybeSingle();
 
   if (existing) {
@@ -86,16 +147,7 @@ export async function POST(request: NextRequest) {
     sqft: null as number | null,
   };
   try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      },
-      signal: AbortSignal.timeout(8000),
-    });
-
-    if (response.ok) {
-      const html = await response.text();
+    const { html } = await fetchListingHtml(listingUrl, 8000);
 
       const ogTitle =
         html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1] ??
@@ -154,7 +206,6 @@ export async function POST(request: NextRequest) {
           // JSON-LD parsing is best-effort
         }
       }
-    }
   } catch {
     // Preview scraping is best-effort
   }
@@ -167,7 +218,7 @@ export async function POST(request: NextRequest) {
   const { data, error: insertError } = await supabase
     .from("candidate_homes")
     .insert({
-      url,
+      url: listingUrl,
       title: preview.title,
       image_url: preview.image_url,
       address: preview.address,

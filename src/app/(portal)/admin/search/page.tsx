@@ -1,273 +1,212 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
-import type { SavedHomePreview } from "@/lib/types";
+import { useCallback, useEffect, useState } from "react";
+
+type Listing = {
+  id: string;
+  redfin_url: string;
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  price: number;
+  beds: number | null;
+  baths: number | null;
+  sqft: number | null;
+  property_type: string | null;
+  days_on_market: number | null;
+  image_url: string | null;
+  first_seen_at: string;
+  is_candidate: boolean;
+};
+
+type Filters = {
+  city: string;
+  minPrice: string;
+  maxPrice: string;
+  minBeds: string;
+  minBaths: string;
+  propertyType: string;
+};
+
+const initialFilters: Filters = {
+  city: "",
+  minPrice: "",
+  maxPrice: "",
+  minBeds: "",
+  minBaths: "",
+  propertyType: "",
+};
+
+const priceOptions = [
+  { value: "1000000", label: "$1M" },
+  { value: "2000000", label: "$2M" },
+  { value: "3000000", label: "$3M" },
+  { value: "4000000", label: "$4M" },
+];
+
+const numberFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0,
+});
 
 export default function AdminSearchPage() {
-  const [url, setUrl] = useState("");
-  const [preview, setPreview] = useState<SavedHomePreview | null>(null);
-  const [loadingPreview, setLoadingPreview] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [filters, setFilters] = useState<Filters>(initialFilters);
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [cities, setCities] = useState<string[]>([]);
+  const [propertyTypes, setPropertyTypes] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [beds, setBeds] = useState("");
-  const [baths, setBaths] = useState("");
-  const [sqft, setSqft] = useState("");
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  const [addingId, setAddingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    return () => {
-      abortRef.current?.abort();
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, []);
-
-  const fetchPreview = useCallback(async (inputUrl: string) => {
-    if (!inputUrl.startsWith("http")) return;
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
-    setLoadingPreview(true);
+  const fetchListings = useCallback(async (signal?: AbortSignal) => {
+    setLoading(true);
     setError("");
+
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.set(key, value);
+    });
+
     try {
-      const res = await fetch("/api/portal/saved-homes/preview", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: inputUrl }),
-        signal: abortRef.current.signal,
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setPreview(data);
-      }
+      const response = await fetch(`/api/admin/listings?${params.toString()}`, { signal });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to load listings");
+      setListings(data.listings);
+      setCities(data.facets.cities);
+      setPropertyTypes(data.facets.propertyTypes);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
+      setError(err instanceof Error ? err.message : "Unable to load listings");
     } finally {
-      setLoadingPreview(false);
+      setLoading(false);
     }
-  }, []);
+  }, [filters]);
 
-  function handleUrlChange(value: string) {
-    setUrl(value);
-    setSaved(false);
-    setError("");
-    setPreview(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchListings(controller.signal);
+    return () => controller.abort();
+  }, [fetchListings]);
 
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-
-    if (value.startsWith("http")) {
-      debounceRef.current = setTimeout(() => {
-        fetchPreview(value);
-      }, 800);
-    }
+  function updateFilter(key: keyof Filters, value: string) {
+    setFilters((current) => ({ ...current, [key]: value }));
   }
 
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault();
-    if (!url) return;
-
-    setSaving(true);
+  async function addCandidate(listing: Listing) {
+    setAddingId(listing.id);
     setError("");
-
     try {
-      const res = await fetch("/api/admin/candidate-homes", {
+      const response = await fetch("/api/admin/candidate-homes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url,
-          beds: beds ? parseInt(beds, 10) : undefined,
-          baths: baths ? parseFloat(baths) : undefined,
-          sqft: sqft ? parseInt(sqft, 10) : undefined,
-        }),
+        body: JSON.stringify({ listingId: listing.id }),
       });
-
-      if (!res.ok) {
-        const data = await res.json();
-        setError(data.error || "Failed to add");
-        return;
+      const data = await response.json();
+      if (!response.ok && response.status !== 409) {
+        throw new Error(data.error || "Unable to add candidate");
       }
-
-      setSaved(true);
-      setUrl("");
-      setPreview(null);
-      setBeds("");
-      setBaths("");
-      setSqft("");
-    } catch {
-      setError("Failed to add listing");
+      setListings((current) => current.map((item) =>
+        item.id === listing.id ? { ...item, is_candidate: true } : item
+      ));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to add candidate");
     } finally {
-      setSaving(false);
+      setAddingId(null);
     }
   }
 
   return (
     <div>
-      <div className="mb-8">
-        <p className="text-[#d4a012] text-xs uppercase tracking-[0.3em] mb-2">
-          Search
-        </p>
-        <h1 className="font-serif text-3xl text-neutral-900">Find Homes</h1>
-        <div className="w-16 h-0.5 bg-[#d4a012] mt-4" />
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="mb-2 text-xs uppercase tracking-[0.3em] text-[#d4a012]">Listing Search</p>
+          <h1 className="font-serif text-3xl text-neutral-900">Active Homes</h1>
+          <div className="mt-4 h-0.5 w-16 bg-[#d4a012]" />
+        </div>
+        <p className="text-sm text-neutral-500">Search the latest active inventory collected by the daily listing feed.</p>
       </div>
 
-      {/* Step 1: Open Redfin */}
-      <div className="mb-8">
-        <h2 className="text-sm uppercase tracking-wider text-neutral-500 mb-3">
-          Step 1: Browse Listings
-        </h2>
-        <a
-          href="https://www.redfin.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 bg-[#d4a012] text-white px-6 py-3 text-sm uppercase tracking-wider hover:bg-[#b8890f] transition-colors"
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-            />
-          </svg>
-          Search on Redfin
-        </a>
-        <p className="text-neutral-400 text-xs mt-2">
-          Opens in a new tab. Copy the listing URL when you find a home you
-          like.
+      <section className="mb-6 border-y border-neutral-200 bg-neutral-50 py-5">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
+          <select value={filters.city} onChange={(event) => updateFilter("city", event.target.value)} className="border border-neutral-200 bg-white px-3 py-2.5 text-sm text-neutral-700 focus:border-[#d4a012] focus:outline-none">
+            <option value="">All cities</option>
+            {cities.map((city) => <option key={city} value={city}>{city}</option>)}
+          </select>
+          <select value={filters.minPrice} onChange={(event) => updateFilter("minPrice", event.target.value)} className="border border-neutral-200 bg-white px-3 py-2.5 text-sm text-neutral-700 focus:border-[#d4a012] focus:outline-none">
+            <option value="">No min price</option>
+            {priceOptions.map((option) => <option key={option.value} value={option.value}>{option.label}+</option>)}
+          </select>
+          <select value={filters.maxPrice} onChange={(event) => updateFilter("maxPrice", event.target.value)} className="border border-neutral-200 bg-white px-3 py-2.5 text-sm text-neutral-700 focus:border-[#d4a012] focus:outline-none">
+            <option value="">No max price</option>
+            {priceOptions.map((option) => <option key={option.value} value={option.value}>Less than {option.label}</option>)}
+          </select>
+          <select value={filters.minBeds} onChange={(event) => updateFilter("minBeds", event.target.value)} className="border border-neutral-200 bg-white px-3 py-2.5 text-sm text-neutral-700 focus:border-[#d4a012] focus:outline-none">
+            <option value="">Any beds</option>
+            {[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}+ beds</option>)}
+          </select>
+          <select value={filters.minBaths} onChange={(event) => updateFilter("minBaths", event.target.value)} className="border border-neutral-200 bg-white px-3 py-2.5 text-sm text-neutral-700 focus:border-[#d4a012] focus:outline-none">
+            <option value="">Any baths</option>
+            {[1, 1.5, 2, 2.5, 3, 4].map((value) => <option key={value} value={value}>{value}+ baths</option>)}
+          </select>
+          <select value={filters.propertyType} onChange={(event) => updateFilter("propertyType", event.target.value)} className="border border-neutral-200 bg-white px-3 py-2.5 text-sm text-neutral-700 focus:border-[#d4a012] focus:outline-none">
+            <option value="">All home types</option>
+            {propertyTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+          </select>
+        </div>
+      </section>
+
+      <div className="mb-4 flex items-center justify-between">
+        <p className="text-xs uppercase tracking-wider text-neutral-400">
+          {loading ? "Loading inventory" : `${listings.length} active listing${listings.length === 1 ? "" : "s"}`}
         </p>
+        {Object.values(filters).some(Boolean) && (
+          <button type="button" onClick={() => setFilters(initialFilters)} className="text-xs uppercase tracking-wider text-[#d4a012] hover:text-[#b8890f]">Clear filters</button>
+        )}
       </div>
 
-      {/* Step 2: Paste URL */}
-      <div className="mb-8">
-        <h2 className="text-sm uppercase tracking-wider text-neutral-500 mb-3">
-          Step 2: Add to Candidates
-        </h2>
+      {error && <p className="mb-5 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
 
-        <form onSubmit={handleSave} className="space-y-4">
-          <div>
-            <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-2">
-              Listing URL
-            </label>
-            <input
-              type="url"
-              value={url}
-              onChange={(e) => handleUrlChange(e.target.value)}
-              placeholder="Paste a Redfin, Zillow, or other listing URL..."
-              className="w-full border border-neutral-200 px-4 py-3 text-sm text-neutral-900 placeholder-neutral-300 focus:outline-none focus:border-[#d4a012] transition-colors"
-            />
-          </div>
-
-          {/* Preview */}
-          {loadingPreview && (
-            <div className="bg-neutral-50 border border-neutral-200 p-4">
-              <p className="text-neutral-400 text-sm">Loading preview...</p>
-            </div>
-          )}
-
-          {preview && !loadingPreview && (
-            <div className="bg-neutral-50 border border-neutral-200 flex overflow-hidden">
-              {preview.image_url && (
-                <div className="w-40 flex-shrink-0">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={preview.image_url}
-                    alt={preview.address || "Preview"}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
+      {loading ? (
+        <div className="py-16 text-center text-sm text-neutral-400">Loading active listings...</div>
+      ) : listings.length === 0 ? (
+        <div className="border border-neutral-200 bg-neutral-50 py-16 text-center">
+          <p className="font-serif text-lg text-neutral-700">No active listings match these filters.</p>
+          <p className="mt-2 text-sm text-neutral-400">Try broadening the search, or wait for the next listing feed refresh.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {listings.map((listing) => (
+            <article key={listing.id} className="overflow-hidden border border-neutral-200 bg-white transition-colors hover:border-[#d4a012]">
+              {listing.image_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={listing.image_url} alt={listing.address} className="aspect-[16/10] w-full object-cover" />
+              ) : (
+                <div className="aspect-[16/10] bg-neutral-100" />
               )}
               <div className="p-4">
-                {preview.price && (
-                  <p className="font-serif text-xl text-neutral-900">
-                    {preview.price}
-                  </p>
-                )}
-                {preview.address && (
-                  <p className="text-sm text-neutral-600 mt-1">
-                    {preview.address}
-                  </p>
-                )}
-                {!preview.price && !preview.address && preview.title && (
-                  <p className="text-sm text-neutral-600">{preview.title}</p>
-                )}
-                {!preview.price && !preview.address && !preview.title && (
-                  <p className="text-sm text-neutral-400">
-                    No preview available — you can still save this URL.
-                  </p>
-                )}
+                <div className="mb-2 flex items-start justify-between gap-3">
+                  <p className="font-serif text-2xl text-neutral-900">{numberFormatter.format(listing.price)}</p>
+                  {listing.is_candidate && <span className="shrink-0 border border-[#d4a012]/30 bg-[#faf8f0] px-2 py-1 text-[10px] uppercase tracking-wider text-[#9d7610]">Added to Candidates</span>}
+                </div>
+                <p className="text-sm text-neutral-800">{listing.address}</p>
+                <p className="mt-1 text-sm text-neutral-500">{listing.city}, {listing.state} {listing.zip}</p>
+                <p className="mt-3 text-sm text-neutral-500">
+                  {[listing.beds ? `${listing.beds} bd` : null, listing.baths ? `${listing.baths} ba` : null, listing.sqft ? `${listing.sqft.toLocaleString()} sqft` : null].filter(Boolean).join(" · ") || "Details pending"}
+                </p>
+                <p className="mt-1 min-h-5 text-xs text-neutral-400">{[listing.property_type, listing.days_on_market !== null ? `${listing.days_on_market} days on market` : null].filter(Boolean).join(" · ")}</p>
+                <div className="mt-4 flex items-center gap-4 border-t border-neutral-100 pt-3">
+                  <a href={listing.redfin_url} target="_blank" rel="noopener noreferrer" className="text-xs uppercase tracking-wider text-[#d4a012] hover:text-[#b8890f]">View Listing</a>
+                  <button type="button" disabled={listing.is_candidate || addingId === listing.id} onClick={() => addCandidate(listing)} className="ml-auto bg-neutral-900 px-3 py-2 text-xs uppercase tracking-wider text-white hover:bg-neutral-700 disabled:cursor-default disabled:bg-neutral-200 disabled:text-neutral-500">
+                    {addingId === listing.id ? "Adding..." : listing.is_candidate ? "Added" : "Add to Candidates"}
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
-
-          {/* Property Details (optional) */}
-          <div>
-            <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-2">
-              Property Details <span className="text-neutral-300">(optional — helps CMA accuracy)</span>
-            </label>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <input
-                  type="number"
-                  value={beds}
-                  onChange={(e) => setBeds(e.target.value)}
-                  placeholder="Beds"
-                  min="0"
-                  className="w-full border border-neutral-200 px-4 py-3 text-sm text-neutral-900 placeholder-neutral-300 focus:outline-none focus:border-[#d4a012] transition-colors"
-                />
-              </div>
-              <div>
-                <input
-                  type="number"
-                  value={baths}
-                  onChange={(e) => setBaths(e.target.value)}
-                  placeholder="Baths"
-                  min="0"
-                  step="0.5"
-                  className="w-full border border-neutral-200 px-4 py-3 text-sm text-neutral-900 placeholder-neutral-300 focus:outline-none focus:border-[#d4a012] transition-colors"
-                />
-              </div>
-              <div>
-                <input
-                  type="number"
-                  value={sqft}
-                  onChange={(e) => setSqft(e.target.value)}
-                  placeholder="Sqft"
-                  min="0"
-                  className="w-full border border-neutral-200 px-4 py-3 text-sm text-neutral-900 placeholder-neutral-300 focus:outline-none focus:border-[#d4a012] transition-colors"
-                />
-              </div>
-            </div>
-          </div>
-
-          {error && <p className="text-red-500 text-sm">{error}</p>}
-
-          {saved && (
-            <p className="text-green-600 text-sm">
-              Home added to candidates! View it on the{" "}
-              <a
-                href="/admin/candidates"
-                className="text-[#d4a012] underline"
-              >
-                Candidates
-              </a>{" "}
-              page.
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={!url || saving}
-            className="bg-neutral-900 text-white px-6 py-3 text-sm uppercase tracking-wider hover:bg-neutral-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {saving ? "Adding..." : "Add to Candidates"}
-          </button>
-        </form>
-      </div>
+            </article>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

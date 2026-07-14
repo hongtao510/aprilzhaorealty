@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { validateListingUrl } from "@/lib/listing-url";
 
 export async function GET() {
   const supabase = await createClient();
@@ -33,15 +34,21 @@ export async function POST(request: Request) {
   const { url, title, image_url, address, price, notes } =
     await request.json();
 
-  if (!url) {
-    return NextResponse.json({ error: "url is required" }, { status: 400 });
+  let listingUrl: string;
+  try {
+    listingUrl = validateListingUrl(url).toString();
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Invalid listing URL" },
+      { status: 400 }
+    );
   }
 
   const { data: home, error } = await supabase
     .from("saved_homes")
     .insert({
       client_id: user.id,
-      url,
+      url: listingUrl,
       title: title || null,
       image_url: image_url || null,
       address: address || null,

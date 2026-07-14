@@ -42,6 +42,39 @@ function isPublicRoute(pathname: string) {
   );
 }
 
+function authUnavailableResponse(request: NextRequest) {
+  if (request.nextUrl.pathname.startsWith("/api/")) {
+    return NextResponse.json(
+      { error: "Authentication service temporarily unavailable" },
+      { status: 503 }
+    );
+  }
+
+  return new NextResponse(
+    `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Service temporarily unavailable</title>
+  </head>
+  <body style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; min-height: 100vh; display: grid; place-items: center; background: #fafafa; color: #171717;">
+    <main style="max-width: 32rem; padding: 2rem; text-align: center;">
+      <h1 style="font-size: 1.5rem; margin: 0 0 0.75rem;">Service temporarily unavailable</h1>
+      <p style="line-height: 1.6; margin: 0; color: #525252;">We could not verify access right now. Please refresh in a moment.</p>
+    </main>
+  </body>
+</html>`,
+    {
+      status: 503,
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+      },
+    }
+  );
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -57,9 +90,9 @@ export async function middleware(request: NextRequest) {
     user = session.user;
     supabase = session.supabase;
     supabaseResponse = session.supabaseResponse;
-  } catch {
-    // Supabase unreachable — let the request through; pages handle auth client-side
-    return NextResponse.next();
+  } catch (error) {
+    console.error("Middleware session verification failed:", error);
+    return authUnavailableResponse(request);
   }
 
   // Login page — redirect to portal if already logged in
@@ -118,9 +151,9 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL("/login", request.url));
       }
     }
-  } catch {
-    // If profile fetch fails/times out, allow through (client-side will handle)
-    console.error("Middleware profile fetch timed out");
+  } catch (error) {
+    console.error("Middleware profile verification failed:", error);
+    return authUnavailableResponse(request);
   }
 
   return supabaseResponse;

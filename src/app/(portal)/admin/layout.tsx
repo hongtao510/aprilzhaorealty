@@ -11,18 +11,29 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { profile, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   const router = useRouter();
 
   // Middleware already verified admin access — this is a fallback safety check
   useEffect(() => {
-    if (!loading && profile && profile.role !== "admin") {
+    if (!loading && (!user || !profile)) {
+      router.push("/login");
+      return;
+    }
+
+    if (!loading && profile?.role !== "admin") {
       router.push("/login");
     }
-  }, [loading, profile, router]);
+  }, [loading, profile, router, user]);
 
-  // Render layout immediately — middleware guarantees admin access,
-  // so no need to block on client-side auth loading
+  if (loading || !user || profile?.role !== "admin") {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center px-6">
+        <p className="text-sm text-neutral-500">Checking access...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-white">
       <PortalHeader />
