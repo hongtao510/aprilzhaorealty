@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import type { CompsResult } from "@/lib/types";
+import PricingMethodSummary from "@/components/comps/PricingMethodSummary";
 
 interface CompsModalProps {
   isOpen: boolean;
@@ -16,10 +17,9 @@ type ModelOption = {
 };
 
 const models: ModelOption[] = [
-  { value: "claude-opus-4-7", label: "Opus 4.7 Latest" },
-  { value: "claude-opus-4-6", label: "Opus 4.6 Best" },
-  { value: "claude-sonnet-4-6", label: "Sonnet 4.6 Balanced" },
-  { value: "claude-haiku-4-5-20251001", label: "Haiku 4.5 Fast" },
+  { value: "gpt-5.6-sol", label: "GPT-5.6 Sol Best" },
+  { value: "gpt-5.6-terra", label: "GPT-5.6 Terra Balanced" },
+  { value: "gpt-5.6-luna", label: "GPT-5.6 Luna Fast" },
 ];
 
 function formatMoney(n: number): string {
@@ -44,7 +44,7 @@ export default function CompsModal({
   homeAddress,
   homeId,
 }: CompsModalProps) {
-  const [model, setModel] = useState("claude-opus-4-7");
+  const [model, setModel] = useState("gpt-5.6-sol");
   const [result, setResult] = useState<CompsResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -204,11 +204,11 @@ export default function CompsModal({
                 <h3 className="text-[10px] uppercase tracking-wider text-neutral-400 mb-3">Price Estimate</h3>
                 <div className="grid grid-cols-3 gap-4">
                   <div className="bg-neutral-50 border border-neutral-200 rounded p-4 text-center">
-                    <p className="text-[10px] uppercase tracking-wider text-neutral-400 mb-1">Comp-Based</p>
+                    <p className="text-[10px] uppercase tracking-wider text-neutral-400 mb-1">Nearby Baseline</p>
                     <p className="font-serif text-2xl text-neutral-900">{formatFullPrice(result.estimate.comp_based)}</p>
                   </div>
                   <div className="bg-[#d4a012]/10 border border-[#d4a012]/30 rounded p-4 text-center">
-                    <p className="text-[10px] uppercase tracking-wider text-[#d4a012] mb-1">Trend-Adjusted</p>
+                    <p className="text-[10px] uppercase tracking-wider text-[#d4a012] mb-1">Current Market</p>
                     <p className="font-serif text-2xl text-neutral-900">{formatFullPrice(result.estimate.trend_adjusted)}</p>
                     <p className="text-xs text-neutral-500 mt-1">
                       {result.estimate.trend_adjustment_pct >= 0 ? "+" : ""}
@@ -220,6 +220,7 @@ export default function CompsModal({
                     <p className={`font-serif text-2xl ${tempColor}`}>{tempLabel}</p>
                   </div>
                 </div>
+                <PricingMethodSummary estimate={result.estimate} />
               </section>
 
               {/* 3. Price Range */}

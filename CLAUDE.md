@@ -17,7 +17,7 @@ Local dev: run on port 3001 (`npm run dev -- -p 3001`), not the default 3000.
 
 ## Architecture
 
-Next.js 16 (App Router) + React 19 + Tailwind v4 + TypeScript, deployed on Vercel. Data lives in Supabase (Postgres + Auth + Storage); static Listing content lives in `src/lib/data.ts`. Email via Resend. Claude API used for the Find Comps CMA feature.
+Next.js 16 (App Router) + React 19 + Tailwind v4 + TypeScript, deployed on Vercel. Data lives in Supabase (Postgres + Auth + Storage); static Listing content lives in `src/lib/data.ts`. Email via Resend. OpenAI Responses API is used for the Find Comps CMA feature.
 
 ### Route groups (`src/app`)
 
@@ -45,7 +45,7 @@ Four flavors — pick based on execution context:
 ### Redfin integration
 
 - `src/lib/redfin-listings.ts` — scrapes active for-sale listings from Redfin's `stingray/api/gis-csv` endpoint for a fixed list of `FEATURED_CITIES` (San Mateo through Redwood City) using bounding-box polygons. Parses the CSV directly.
-- `src/lib/redfin-scraper.ts` — scrapes recently sold comps by zip for the Find Comps feature. Resolves zip → bounds via Redfin autocomplete when the zip isn't in `ZIP_BOUNDS`. Whole pipeline wrapped in a 20s timeout; on failure returns `source: "claude-knowledge"` so the caller falls back to Claude's training data.
+- `src/lib/redfin-scraper.ts` — scrapes recently sold comps by zip for the Find Comps feature. Resolves zip → bounds via Redfin autocomplete when the zip isn't in `ZIP_BOUNDS`. Whole pipeline wrapped in a 20s timeout; on failure returns `source: "model-knowledge"` so the caller can fall back to unverified model knowledge.
 
 ### Daily listings cron (`/api/cron/scrape-listings`)
 
@@ -61,7 +61,7 @@ Scheduled by `vercel.json` (`0 15 * * *` = 8am PT). Flow:
 
 ### Find Comps (CMA) flow
 
-`/api/admin/candidate-homes/[id]/comps` takes a candidate home, calls the Anthropic SDK (`@anthropic-ai/sdk`) with the housing-comparisons prompt, caches the structured `CompsResult` in the `candidate_comps` table for 7 days, and renders it in `CompsModal` + the public `/comps/[id]` page. Model selectable via query param (defaults to `claude-opus-4-6`). See `docs/plans/2026-03-07-find-comps-feature-design.md` for the full design.
+`/api/admin/candidate-homes/[id]/comps` takes a candidate home, calls the OpenAI SDK with the housing-comparisons prompt and a strict JSON schema, caches the structured `CompsResult` in the `candidate_comps` table for 7 days, and renders it in `CompsModal` + the public `/comps/[id]` page. Model selectable via query param (defaults to `gpt-5.6-terra`).
 
 ### Database schema
 
@@ -76,7 +76,7 @@ Matching TypeScript row types live in `src/lib/types.ts`.
 
 ### Env vars (see `.env.example`)
 
-Required for full functionality: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `CONTACT_EMAIL`, `CRON_SECRET`, `ANTHROPIC_API_KEY`. Analytics: `NEXT_PUBLIC_GA_MEASUREMENT_ID`. Newsletter unsubscribe links use `NEXT_PUBLIC_SITE_URL` (falls back to `https://aprilzhaohome.com`).
+Required for full functionality: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `CONTACT_EMAIL`, `CRON_SECRET`, `OPENAI_API_KEY`. Analytics: `NEXT_PUBLIC_GA_MEASUREMENT_ID`. Newsletter unsubscribe links use `NEXT_PUBLIC_SITE_URL` (falls back to `https://aprilzhaohome.com`).
 
 ### Auth & newsletter
 

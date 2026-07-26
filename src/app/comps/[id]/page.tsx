@@ -3,15 +3,15 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import type { CompsResult } from "@/lib/types";
+import type { CompsEstimate, CompsResult } from "@/lib/types";
+import PricingMethodSummary from "@/components/comps/PricingMethodSummary";
 
 const MapPicker = dynamic(() => import("@/components/comps/MapPicker"), { ssr: false });
 
 const MODELS = [
-  { value: "claude-opus-4-7", label: "Opus 4.7 (Latest)" },
-  { value: "claude-opus-4-6", label: "Opus 4.6 (Best)" },
-  { value: "claude-sonnet-4-6", label: "Sonnet 4.6 (Balanced)" },
-  { value: "claude-haiku-4-5-20251001", label: "Haiku 4.5 (Fast)" },
+  { value: "gpt-5.6-sol", label: "GPT-5.6 Sol (Best)" },
+  { value: "gpt-5.6-terra", label: "GPT-5.6 Terra (Balanced)" },
+  { value: "gpt-5.6-luna", label: "GPT-5.6 Luna (Fast)" },
 ];
 
 function formatMoney(n: number): string {
@@ -33,10 +33,11 @@ function timestamp(): string {
 
 export default function CompsPage() {
   const { id } = useParams<{ id: string }>();
-  const [model, setModel] = useState("claude-opus-4-7");
+  const [model, setModel] = useState("gpt-5.6-sol");
   const [logs, setLogs] = useState<{ time: string; message: string }[]>([]);
   const [rawOutput, setRawOutput] = useState("");
   const [result, setResult] = useState<CompsResult | null>(null);
+  const [tunedEstimate, setTunedEstimate] = useState<CompsEstimate | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -65,6 +66,7 @@ export default function CompsPage() {
       setLoading(true);
       setError(null);
       setResult(null);
+      setTunedEstimate(null);
       setLogs([]);
       setRawOutput("");
 
@@ -156,6 +158,7 @@ export default function CompsPage() {
   }, []);
 
   const r = result;
+  const activeEstimate = tunedEstimate ?? r?.estimate ?? null;
 
   return (
     <div>
@@ -261,11 +264,11 @@ export default function CompsPage() {
         </div>
       </div>
 
-      {/* Raw Claude Output — always visible while loading or if there's output */}
+      {/* Raw model output — always visible while loading or if there's output */}
       {(loading || rawOutput) && (
         <div className="mb-8">
           <div className="bg-neutral-800 rounded-t-lg px-4 py-2 flex items-center justify-between">
-            <span className="text-xs text-neutral-400 font-mono">Claude Raw Output</span>
+            <span className="text-xs text-neutral-400 font-mono">OpenAI Structured Output</span>
             <span className="text-xs text-neutral-500 font-mono">
               {rawOutput ? `${rawOutput.length.toLocaleString()} chars` : "waiting for response..."}
             </span>
@@ -274,7 +277,7 @@ export default function CompsPage() {
             ref={rawRef}
             className="bg-neutral-900 rounded-b-lg p-4 font-mono text-xs text-green-400 max-h-[400px] overflow-y-auto whitespace-pre-wrap break-all leading-relaxed min-h-[100px]"
           >
-            {rawOutput || (loading && <span className="text-neutral-600">Connecting to Claude API...</span>)}
+            {rawOutput || (loading && <span className="text-neutral-600">Connecting to OpenAI API...</span>)}
             {loading && <span className="animate-pulse text-green-300">▌</span>}
           </pre>
         </div>
@@ -310,36 +313,42 @@ export default function CompsPage() {
           </section>
 
           {/* Price Estimate */}
-          <section>
+          {activeEstimate && <section>
             <h3 className="text-xs uppercase tracking-[0.2em] text-[#d4a012] mb-3">Price Estimate</h3>
+            {tunedEstimate && (
+              <p className="mb-3 text-sm text-emerald-700">
+                Updated from your checked comparable sales.
+              </p>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-neutral-50 border border-neutral-200 rounded p-4 text-center">
-                <p className="text-xs text-neutral-500 uppercase tracking-wider mb-1">Comp-Based</p>
-                <p className="font-serif text-2xl text-neutral-900">{formatFullPrice(r.estimate.comp_based)}</p>
-                <p className="text-xs text-neutral-400 mt-1">{formatFullPrice(r.estimate.weighted_price_per_sqft)}/sqft</p>
+                <p className="text-xs text-neutral-500 uppercase tracking-wider mb-1">Nearby Baseline</p>
+                <p className="font-serif text-2xl text-neutral-900">{formatFullPrice(activeEstimate.comp_based)}</p>
+                <p className="text-xs text-neutral-400 mt-1">{formatFullPrice(activeEstimate.weighted_price_per_sqft)}/sqft</p>
               </div>
               <div className="bg-[#d4a012]/5 border border-[#d4a012]/30 rounded p-4 text-center">
-                <p className="text-xs text-[#d4a012] uppercase tracking-wider mb-1">Trend-Adjusted</p>
-                <p className="font-serif text-2xl text-neutral-900">{formatFullPrice(r.estimate.trend_adjusted)}</p>
+                <p className="text-xs text-[#d4a012] uppercase tracking-wider mb-1">Current Market</p>
+                <p className="font-serif text-2xl text-neutral-900">{formatFullPrice(activeEstimate.trend_adjusted)}</p>
                 <p className="text-xs text-neutral-400 mt-1">
-                  {r.estimate.trend_adjustment_pct >= 0 ? "+" : ""}{r.estimate.trend_adjustment_pct}% adjustment
+                  {activeEstimate.trend_adjustment_pct >= 0 ? "+" : ""}{activeEstimate.trend_adjustment_pct}% adjustment
                 </p>
               </div>
               <div className="bg-neutral-50 border border-neutral-200 rounded p-4 text-center">
                 <p className="text-xs text-neutral-500 uppercase tracking-wider mb-1">Market</p>
                 <p className={`font-serif text-2xl capitalize ${
-                  r.estimate.market_temperature === "hot" ? "text-red-600" : r.estimate.market_temperature === "warm" ? "text-amber-600" : "text-blue-600"
-                }`}>{r.estimate.market_temperature}</p>
+                  activeEstimate.market_temperature === "hot" ? "text-red-600" : activeEstimate.market_temperature === "warm" ? "text-amber-600" : "text-blue-600"
+                }`}>{activeEstimate.market_temperature}</p>
                 <p className="text-xs text-neutral-400 mt-1">MoM: {r.market_signals.mom_change}</p>
               </div>
             </div>
-          </section>
+            <PricingMethodSummary estimate={activeEstimate} />
+          </section>}
 
           {/* Price Range */}
-          <section>
+          {activeEstimate && <section>
             <h3 className="text-xs uppercase tracking-[0.2em] text-[#d4a012] mb-3">Price Range</h3>
             <div className="bg-neutral-50 border border-neutral-200 rounded p-4">
-              <PriceRangeBar estimate={r.estimate} />
+              <PriceRangeBar estimate={activeEstimate} />
             </div>
 
             <table className="w-full mt-4 text-sm">
@@ -353,27 +362,27 @@ export default function CompsPage() {
               <tbody className="divide-y divide-neutral-100">
                 <tr>
                   <td className="py-2 text-[#d4a012]">★★★★★ Most likely</td>
-                  <td className="py-2">{formatFullPrice(r.estimate.range.most_likely[0])} – {formatFullPrice(r.estimate.range.most_likely[1])}</td>
+                  <td className="py-2">{formatFullPrice(activeEstimate.range.most_likely[0])} – {formatFullPrice(activeEstimate.range.most_likely[1])}</td>
                   <td className="py-2 text-right font-medium">50%</td>
                 </tr>
                 <tr>
                   <td className="py-2 text-[#d4a012]/70">★★★★ Likely</td>
-                  <td className="py-2">{formatFullPrice(r.estimate.range.likely[0])} – {formatFullPrice(r.estimate.range.likely[1])}</td>
+                  <td className="py-2">{formatFullPrice(activeEstimate.range.likely[0])} – {formatFullPrice(activeEstimate.range.likely[1])}</td>
                   <td className="py-2 text-right font-medium">25%</td>
                 </tr>
                 <tr>
                   <td className="py-2 text-neutral-400">★★★ Possible</td>
-                  <td className="py-2">{formatFullPrice(r.estimate.range.possible[0])} – {formatFullPrice(r.estimate.range.possible[1])}</td>
+                  <td className="py-2">{formatFullPrice(activeEstimate.range.possible[0])} – {formatFullPrice(activeEstimate.range.possible[1])}</td>
                   <td className="py-2 text-right font-medium">15%</td>
                 </tr>
                 <tr>
                   <td className="py-2 text-neutral-300">★★ Unlikely</td>
-                  <td className="py-2">Below {formatFullPrice(r.estimate.range.unlikely_below)} or above {formatFullPrice(r.estimate.range.unlikely_above)}</td>
+                  <td className="py-2">Below {formatFullPrice(activeEstimate.range.unlikely_below)} or above {formatFullPrice(activeEstimate.range.unlikely_above)}</td>
                   <td className="py-2 text-right font-medium">10%</td>
                 </tr>
               </tbody>
             </table>
-          </section>
+          </section>}
 
           {/* Market Signals */}
           <section>
@@ -393,12 +402,15 @@ export default function CompsPage() {
             </div>
           </section>
 
-          {/* Map view of comps + nearby candidates */}
+          {/* Selectable comp shortlist + map */}
           {r.candidates && r.candidates.length > 0 && (
             <section>
               <h3 className="text-xs uppercase tracking-[0.2em] text-[#d4a012] mb-3">
-                Map View ({r.candidates.length} nearby)
+                Fine-tune Comparable Sales
               </h3>
+              <p className="mb-3 text-sm text-neutral-600">
+                Start with the suggested sales, then check or uncheck candidates to update the estimate.
+              </p>
               <MapPicker
                 subject={{
                   address: r.subject.address,
@@ -411,13 +423,18 @@ export default function CompsPage() {
                 }}
                 candidates={r.candidates}
                 initialSelectedUrls={r.comps.map((c) => c.redfin_url ?? "").filter(Boolean)}
+                marketTemperature={r.estimate.market_temperature}
+                onEstimateChange={setTunedEstimate}
               />
             </section>
           )}
 
           {/* Comps Table */}
           <section>
-            <h3 className="text-xs uppercase tracking-[0.2em] text-[#d4a012] mb-3">Top {r.comps.length} Comparable Sales</h3>
+            <h3 className="text-xs uppercase tracking-[0.2em] text-[#d4a012] mb-1">Initial AI Suggestions</h3>
+            <p className="mb-3 text-xs text-neutral-500">
+              This is the starting set from the analysis. Your checked shortlist above controls the tuned estimate.
+            </p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>

@@ -6,17 +6,22 @@ import type { CompsEstimate } from "@/lib/types";
 /**
  * Stateless pricing recompute. Used by the manual map-picker:
  * client sends the user-selected comps + subject sqft/lot, we return a fresh
- * estimate computed with the same deterministic pipeline.
+ * estimate computed with the same deterministic pipeline. The checked sales
+ * intentionally become the pricing pool so every checkbox can change the result.
  */
 interface RecomputeBody {
   subjectSqft: number;
   subjectLotSqft?: number | null;
+  subjectZip?: string | null;
   marketTemperature?: CompsEstimate["market_temperature"];
-  trendPct?: number;
   comps: {
+    address?: string;
+    zip_code?: string | null;
     sold_price: number;
+    sold_date?: string;
     sqft: number;
     similarity_score: number;
+    distance_miles?: number;
     lot_sqft?: number | null;
   }[];
 }
@@ -56,9 +61,10 @@ export async function POST(request: NextRequest) {
     subjectSqft: body.subjectSqft,
     subjectLotSqft: body.subjectLotSqft ?? null,
     comps: body.comps,
+    marketComps: body.comps,
+    subjectZip: body.subjectZip ?? null,
     marketTemperature: body.marketTemperature ?? "warm",
-    trendPct: body.trendPct,
-    strategy: "hybrid",
+    strategy: "median",
   });
 
   return NextResponse.json({ estimate });

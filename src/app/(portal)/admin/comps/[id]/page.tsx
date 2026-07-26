@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import type { CompsResult, CompHomeWithGeo } from "@/lib/types";
+import PricingMethodSummary from "@/components/comps/PricingMethodSummary";
 
 // Leaflet uses window — load only on the client.
 const MapPicker = dynamic(() => import("@/components/comps/MapPicker"), { ssr: false });
@@ -22,14 +23,12 @@ interface CandidatesResponse {
   };
   scrape_source: string;
   enrichment: { attempted: number; fetched: number; ms: number };
-  monthly_drift_pct: number;
 }
 
 const MODELS = [
-  { value: "claude-opus-4-7", label: "Opus 4.7 (Latest)" },
-  { value: "claude-sonnet-4-6", label: "Sonnet 4.6 (Balanced)" },
-  { value: "claude-opus-4-6", label: "Opus 4.6 (Best)" },
-  { value: "claude-haiku-4-5-20251001", label: "Haiku 4.5 (Fast)" },
+  { value: "gpt-5.6-sol", label: "GPT-5.6 Sol (Best)" },
+  { value: "gpt-5.6-terra", label: "GPT-5.6 Terra (Balanced)" },
+  { value: "gpt-5.6-luna", label: "GPT-5.6 Luna (Fast)" },
 ];
 
 function formatMoney(n: number): string {
@@ -51,7 +50,7 @@ function timestamp(): string {
 
 export default function CompsPage() {
   const { id } = useParams<{ id: string }>();
-  const [model, setModel] = useState("claude-opus-4-7");
+  const [model, setModel] = useState("gpt-5.6-sol");
   const [logs, setLogs] = useState<{ time: string; message: string }[]>([]);
   const [rawOutput, setRawOutput] = useState("");
   const [result, setResult] = useState<CompsResult | null>(null);
@@ -332,7 +331,7 @@ export default function CompsPage() {
                 onClick={() => fetchComps(true)}
                 disabled={candidatesLoading || selectedUrls.size === 0}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-neutral-900 text-white text-xs uppercase tracking-wider hover:bg-neutral-700 transition-colors rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                title={selectedUrls.size === 0 ? "Pick at least one comp first" : `Analyze with Claude using ${selectedUrls.size} comps`}
+                title={selectedUrls.size === 0 ? "Pick at least one comp first" : `Analyze with OpenAI using ${selectedUrls.size} comps`}
               >
                 <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M8 5v14l11-7z" />
@@ -396,11 +395,11 @@ export default function CompsPage() {
         </div>
       </div>
 
-      {/* Raw Claude Output — always visible while loading or if there's output */}
+      {/* Raw model output — always visible while loading or if there's output */}
       {(loading || rawOutput) && (
         <div className="mb-8">
           <div className="bg-neutral-800 rounded-t-lg px-4 py-2 flex items-center justify-between">
-            <span className="text-xs text-neutral-400 font-mono">Claude Raw Output</span>
+            <span className="text-xs text-neutral-400 font-mono">OpenAI Structured Output</span>
             <span className="text-xs text-neutral-500 font-mono">
               {rawOutput ? `${rawOutput.length.toLocaleString()} chars` : "waiting for response..."}
             </span>
@@ -409,7 +408,7 @@ export default function CompsPage() {
             ref={rawRef}
             className="bg-neutral-900 rounded-b-lg p-4 font-mono text-xs text-green-400 max-h-[400px] overflow-y-auto whitespace-pre-wrap break-all leading-relaxed min-h-[100px]"
           >
-            {rawOutput || (loading && <span className="text-neutral-600">Connecting to Claude API...</span>)}
+            {rawOutput || (loading && <span className="text-neutral-600">Connecting to OpenAI API...</span>)}
             {loading && <span className="animate-pulse text-green-300">▌</span>}
           </pre>
         </div>
@@ -442,7 +441,7 @@ export default function CompsPage() {
       {candidatesData && candidatesData.candidates.length > 0 && (
         <section className="mb-10">
           <h3 className="text-xs uppercase tracking-[0.2em] text-[#d4a012] mb-3">
-            Step 1 — Pick comps to include ({candidatesData.candidates.length} nearby)
+            Step 1 — Pick comps to explain ({candidatesData.candidates.length} candidates)
           </h3>
           <MapPicker
             subject={{
@@ -453,11 +452,14 @@ export default function CompsPage() {
             }}
             candidates={candidatesData.candidates}
             initialSelectedUrls={Array.from(selectedUrls)}
+            marketTemperature={result?.estimate.market_temperature ?? "warm"}
             onSelectionChange={setSelectedUrls}
           />
           <p className="mt-3 text-xs text-neutral-500">
-            Toggle pins or rows to refine. The estimate above the AI report uses your final selection.
-            When you&apos;re happy, click <span className="font-semibold">Run AI Analysis</span> in the top right.
+            Toggle pins or check rows to choose the sales used for pricing and the AI explanation.
+            The estimate updates automatically from the checked set, applying the 0.5-mile baseline
+            and latest 14-day ZIP signal when those sales are selected. When you&apos;re happy, click{" "}
+            <span className="font-semibold">Run AI Analysis</span> in the top right.
           </p>
         </section>
       )}
@@ -533,12 +535,12 @@ export default function CompsPage() {
             <h3 className="text-xs uppercase tracking-[0.2em] text-[#d4a012] mb-3">Price Estimate</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-neutral-50 border border-neutral-200 rounded p-4 text-center">
-                <p className="text-xs text-neutral-500 uppercase tracking-wider mb-1">Comp-Based</p>
+                <p className="text-xs text-neutral-500 uppercase tracking-wider mb-1">Nearby Baseline</p>
                 <p className="font-serif text-2xl text-neutral-900">{formatFullPrice(r.estimate.comp_based)}</p>
                 <p className="text-xs text-neutral-400 mt-1">{formatFullPrice(r.estimate.weighted_price_per_sqft)}/sqft</p>
               </div>
               <div className="bg-[#d4a012]/5 border border-[#d4a012]/30 rounded p-4 text-center">
-                <p className="text-xs text-[#d4a012] uppercase tracking-wider mb-1">Trend-Adjusted</p>
+                <p className="text-xs text-[#d4a012] uppercase tracking-wider mb-1">Current Market</p>
                 <p className="font-serif text-2xl text-neutral-900">{formatFullPrice(r.estimate.trend_adjusted)}</p>
                 <p className="text-xs text-neutral-400 mt-1">
                   {r.estimate.trend_adjustment_pct >= 0 ? "+" : ""}{r.estimate.trend_adjustment_pct}% adjustment
@@ -552,6 +554,7 @@ export default function CompsPage() {
                 <p className="text-xs text-neutral-400 mt-1">MoM: {r.market_signals.mom_change}</p>
               </div>
             </div>
+            <PricingMethodSummary estimate={r.estimate} />
           </section>
 
           {/* Price Range */}

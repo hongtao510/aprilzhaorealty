@@ -154,9 +154,10 @@ export interface CompHome {
   distance_miles?: number;
 }
 
-/** Raw comp data scraped from Redfin before Claude analysis */
+/** Raw comp data scraped from Redfin before model analysis */
 export interface RawComp {
   address: string;
+  zip_code?: string | null;
   sold_price: number;
   sold_date: string;       // YYYY-MM-DD
   sqft: number;
@@ -182,6 +183,7 @@ export interface ScoredComp extends RawComp {
   lot_score: number;        // 0 if subject lot unknown (weight redistributed)
   era_score: number;        // year-built similarity (condition proxy); 1.0 if either side missing
   distance_miles: number;   // haversine; 0 if either side missing geo
+  distance_known: boolean;  // false when either subject or comp coordinates are missing
   distance_score: number;
   tier_score: number;       // 1.0 (neutral) if insufficient data
   neighborhood_score: number; // 1.0 same, 0.5 differ, 1.0 if either null
@@ -198,15 +200,32 @@ export interface ScoredComp extends RawComp {
 /** Result from the scraping pipeline */
 export interface ScrapeResult {
   comps: RawComp[];
-  source: "redfin-api" | "playwright" | "claude-knowledge";
+  source: "redfin-api" | "playwright" | "model-knowledge";
 }
 
 export interface CompsEstimate {
   weighted_price_per_sqft: number;
+  /** $/sqft after applying the latest same-ZIP transaction signal. */
+  current_price_per_sqft?: number;
   comp_based: number;
   trend_adjusted: number;
   market_temperature: "hot" | "warm" | "cool";
   trend_adjustment_pct: number;
+  /** Evidence behind the deterministic price calculation. Optional for cached legacy reports. */
+  pricing_methodology?: {
+    version: number;
+    baseline_source: "nearby_0_5_miles" | "recent_zip_14_days" | "selected_comps";
+    nearby_radius_miles: number;
+    nearby_lookback_days: number;
+    nearby_transaction_count: number;
+    nearby_price_per_sqft: number | null;
+    recent_zip: string | null;
+    recent_zip_lookback_days: number;
+    recent_zip_transaction_count: number;
+    recent_zip_price_per_sqft: number | null;
+    recent_zip_weight_pct: number;
+    fallback_reason: string | null;
+  };
   range: {
     most_likely: [number, number];
     likely: [number, number];
@@ -224,6 +243,7 @@ export interface CompsMarketSignals {
 }
 
 export interface CompHomeWithGeo extends CompHome {
+  zip_code?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   city?: string | null;

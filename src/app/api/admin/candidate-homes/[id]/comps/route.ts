@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import type { CompsResult, RawComp, ScoredComp, ScrapeResult } from "@/lib/types";
 import { scrapeComps } from "@/lib/redfin-scraper";
-import { computeEstimate } from "@/lib/comps/pricing";
-import { scoreComps, type SubjectGeo } from "@/lib/comps/similarity";
+import {
+  computeEstimate,
+  PRICING_METHOD_VERSION,
+  type PricingComp,
+} from "@/lib/comps/pricing";
+import { haversineMiles, scoreComps, type SubjectGeo } from "@/lib/comps/similarity";
 import { fetchPropertyFactsBatch, fetchPropertyFacts } from "@/lib/redfin-property-facts";
-import { computeTrendFromComps, timeAdjustPrice } from "@/lib/comps/trend";
 
 const TOP_N_FOR_PROMPT = 20;
 /** Fetch property facts for top-K candidates + subject before scoring. */
@@ -15,42 +18,104 @@ const TOP_N_FOR_ENRICHMENT = 12;
 const ENRICHMENT_BUDGET_MS = 8_000;
 
 const VALID_MODELS = [
-  "claude-opus-4-7",
-  "claude-opus-4-6",
-  "claude-sonnet-4-6",
-  "claude-haiku-4-5-20251001",
+  "gpt-5.6-sol",
+  "gpt-5.6-terra",
+  "gpt-5.6-luna",
 ] as const;
 type ValidModel = (typeof VALID_MODELS)[number];
 
 const CACHE_DAYS = 7;
 
-/** Extract JSON object from a Claude response that may contain markdown fences or surrounding text. */
-function extractJSON(raw: string): unknown {
-  // 1. Try parsing the raw string directly
-  const trimmed = raw.trim();
-  try { return JSON.parse(trimmed); } catch { /* continue */ }
-
-  // 2. Strip markdown code fences (```json ... ``` or ``` ... ```)
-  const fencePattern = /^`{3,}(?:json)?\s*\n?([\s\S]*?)\n?`{3,}\s*$/i;
-  const fenceMatch = trimmed.match(fencePattern);
-  if (fenceMatch) {
-    try { return JSON.parse(fenceMatch[1].trim()); } catch { /* continue */ }
-  }
-
-  // 3. Find the first { and last } — extract the outermost JSON object
-  const firstBrace = trimmed.indexOf("{");
-  const lastBrace = trimmed.lastIndexOf("}");
-  if (firstBrace !== -1 && lastBrace > firstBrace) {
-    const candidate = trimmed.slice(firstBrace, lastBrace + 1);
-    try { return JSON.parse(candidate); } catch { /* continue */ }
-
-    // 4. Sometimes Claude puts unescaped newlines in string values — try fixing them
-    const fixed = candidate.replace(/(?<=":.*"[^"]*)\n([^"]*")/g, "\\n$1");
-    try { return JSON.parse(fixed); } catch { /* continue */ }
-  }
-
-  throw new Error("Failed to parse Claude response as JSON — no valid JSON object found");
-}
+const COMPS_RESPONSE_FORMAT = {
+  type: "json_schema" as const,
+  name: "comps_result",
+  description: "A comparative market analysis based on the supplied subject and comparable sales.",
+  strict: true,
+  schema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      comps: {
+        type: "array",
+        minItems: 1,
+        maxItems: 8,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            address: { type: "string" },
+            sold_price: { type: "number" },
+            sold_date: { type: "string" },
+            sqft: { type: "number" },
+            beds: { type: "number" },
+            baths: { type: "number" },
+            lot_sqft: { type: "number" },
+            similarity_score: { type: "number" },
+            price_per_sqft: { type: "number" },
+            reason: { type: "string" },
+            redfin_url: { type: "string" },
+            distance_miles: { type: "number" },
+          },
+          required: [
+            "address",
+            "sold_price",
+            "sold_date",
+            "sqft",
+            "beds",
+            "baths",
+            "lot_sqft",
+            "similarity_score",
+            "price_per_sqft",
+            "reason",
+            "redfin_url",
+            "distance_miles",
+          ],
+        },
+      },
+      subject: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          address: { type: "string" },
+          sqft: { type: "number" },
+          beds: { type: "number" },
+          baths: { type: "number" },
+          lot_sqft: { type: "number" },
+        },
+        required: ["address", "sqft", "beds", "baths", "lot_sqft"],
+      },
+      estimate: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          market_temperature: {
+            type: "string",
+            enum: ["hot", "warm", "cool"],
+          },
+        },
+        required: ["market_temperature"],
+      },
+      market_signals: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          sale_to_list_ratio: { type: "string" },
+          days_on_market: { type: "number" },
+          yoy_change: { type: "string" },
+          mom_change: { type: "string" },
+        },
+        required: [
+          "sale_to_list_ratio",
+          "days_on_market",
+          "yoy_change",
+          "mom_change",
+        ],
+      },
+      reasoning: { type: "string" },
+    },
+    required: ["comps", "subject", "estimate", "market_signals", "reasoning"],
+  },
+};
 
 /** Extract 5-digit zip code from an address string. */
 function extractZip(address: string): string | null {
@@ -72,6 +137,7 @@ function extractCity(address: string): string | null {
 function toCandidate(c: ScoredComp): import("@/lib/types").CompHomeWithGeo {
   return {
     address: c.address,
+    zip_code: c.zip_code ?? extractZip(c.address),
     sold_price: c.sold_price,
     sold_date: c.sold_date,
     sqft: c.sqft,
@@ -82,7 +148,7 @@ function toCandidate(c: ScoredComp): import("@/lib/types").CompHomeWithGeo {
     price_per_sqft: c.price_per_sqft,
     reason: "",
     redfin_url: c.redfin_url,
-    distance_miles: c.distance_miles,
+    distance_miles: c.distance_known ? c.distance_miles : undefined,
     latitude: c.latitude ?? null,
     longitude: c.longitude ?? null,
     city: c.city ?? null,
@@ -94,34 +160,55 @@ function toCandidate(c: ScoredComp): import("@/lib/types").CompHomeWithGeo {
   };
 }
 
-/** Overwrite Claude's estimate fields with deterministic math computed from the returned comps. */
+function buildMarketPricingComps(comps: RawComp[], subject: SubjectGeo): PricingComp[] {
+  return comps.map((c) => ({
+    address: c.address,
+    zip_code: c.zip_code ?? extractZip(c.address),
+    sold_price: c.sold_price,
+    sold_date: c.sold_date,
+    sqft: c.sqft,
+    similarity_score: 1,
+    distance_miles:
+      subject.latitude != null &&
+      subject.longitude != null &&
+      c.latitude != null &&
+      c.longitude != null
+        ? haversineMiles(
+            { lat: subject.latitude, lng: subject.longitude },
+            { lat: c.latitude, lng: c.longitude },
+          )
+        : undefined,
+    lot_sqft: c.lot_sqft,
+  }));
+}
+
+/** Overwrite the model's estimate fields with deterministic math computed from the returned comps. */
 function applyDeterministicEstimate(
   result: CompsResult,
   subjectSqft: number,
+  subjectZip: string | null,
+  marketComps: PricingComp[],
 ): CompsResult {
   if (!result.comps?.length || !subjectSqft || subjectSqft <= 0) return result;
 
   const marketTemperature =
     result.estimate?.market_temperature ?? ("warm" as const);
-  const explicitTrendPct =
-    typeof result.estimate?.trend_adjustment_pct === "number"
-      ? result.estimate.trend_adjustment_pct
-      : undefined;
-
-  // Use weighted median (robust to bimodal pools) and hybrid strategy
-  // (lot value matters for small homes in this market).
   const estimate = computeEstimate({
     subjectSqft,
     subjectLotSqft: result.subject?.lot_sqft ?? null,
     comps: result.comps.map((c) => ({
+      address: c.address,
       sold_price: c.sold_price,
+      sold_date: c.sold_date,
       sqft: c.sqft,
       similarity_score: c.similarity_score,
+      distance_miles: c.distance_miles,
       lot_sqft: c.lot_sqft,
     })),
+    marketComps,
+    subjectZip,
     marketTemperature,
-    trendPct: explicitTrendPct,
-    strategy: "hybrid",
+    strategy: "median",
   });
 
   return { ...result, estimate };
@@ -150,12 +237,10 @@ async function verifyAdmin() {
 
 const SYSTEM_PROMPT = `You are a real estate Comparative Market Analysis (CMA) expert. The application has already done the math: it scraped real recently-sold comps from the MLS via Redfin, and computed every numeric similarity, distance, and recency score deterministically. Your job is to add the human judgment on top.
 
-CRITICAL: Your entire response must be ONLY the raw JSON object. Start your response with { and end with }. Do NOT wrap in markdown code fences (no \`\`\`). Do NOT include any text before or after the JSON.
-
 === YOUR TASK ===
-1. Read the subject property details and the pre-scored comp list (10 comps, ranked by total_score).
-2. Pick the BEST 8 of those 10 to include in the report. Use your judgment — usually the top 8 by total_score, but you may demote one for an obvious red flag (e.g., flip with extreme reno premium, atypical layout) and promote a lower-ranked comp in its place. Briefly note any swap in the "reasoning" field.
-3. For each of the 8 chosen comps, write a one-sentence "reason" explaining why it's relevant (e.g., "Same block, similar 1950s ranch layout, sold a month ago").
+1. Read the subject property details and the pre-scored comp list, ranked by total_score.
+2. Pick up to the BEST 8 provided comps to include in the report. If fewer than 8 are provided, use all of them and never invent another comp. Use your judgment — usually the top comps by total_score, but you may demote one for an obvious red flag (e.g., flip with extreme renovation premium, atypical layout) and promote a lower-ranked comp in its place. Briefly note any swap in the "reasoning" field.
+3. For each chosen comp, write a one-sentence "reason" explaining why it's relevant (e.g., "Same block, similar 1950s ranch layout, sold a month ago").
 4. Classify the local market temperature ("hot" / "warm" / "cool") based on your knowledge of the area at the listed sold-date range.
 5. Estimate market_signals (sale_to_list_ratio, days_on_market, yoy_change, mom_change) as best-effort summary strings — these are narrative, not used in math.
 6. Write a 2-3 sentence "reasoning" that summarizes the comp set, what's driving the spread of $/sqft, and any caveats (renovation premium, location tier difference, sparse data, etc.).
@@ -165,7 +250,7 @@ DO NOT recompute similarity, recency, distance, or any score — use the values 
 === OUTPUT SCHEMA ===
 CompsResult:
 {
-  "comps": [CompHome, ...],          // EXACTLY 8 comps from the provided list of 10
+  "comps": [CompHome, ...],          // Up to 8 comps from the provided list
   "subject": { "address": string, "sqft": number, "beds": number, "baths": number, "lot_sqft": number },
   "estimate": {
     "market_temperature": "hot" | "warm" | "cool"
@@ -295,7 +380,7 @@ These comps were retrieved from real MLS data and scored deterministically by th
 
 ${compsTable}
 
-Pick the BEST 8 of the ${scoredComps.length} comps above. Default to the top 8 by total_score; only swap in a lower-ranked comp if there's a clear judgment reason (which you must note in "reasoning"). Use the numeric values verbatim — do not recompute. Write a one-sentence "reason" per comp and a short overall "reasoning" summary.`;
+Pick up to the BEST 8 of the ${scoredComps.length} comps above. If fewer than 8 are provided, use all of them and do not invent additional comps. Default to the top 8 by total_score; only swap in a lower-ranked comp if there's a clear judgment reason (which you must note in "reasoning"). Use the numeric values verbatim — do not recompute. Write a one-sentence "reason" per comp and a short overall "reasoning" summary.`;
 }
 
 export async function POST(
@@ -309,10 +394,10 @@ export async function POST(
   const { searchParams } = new URL(request.url);
   const force = searchParams.get("force") === "true";
   const stream = searchParams.get("stream") === "true";
-  const modelParam = searchParams.get("model") || "claude-sonnet-4-6";
-  /** "candidates" = Phase 1: scrape + score + enrich, return { candidates, subject } without calling Claude. */
+  const modelParam = searchParams.get("model") || "gpt-5.6-terra";
+  /** "candidates" = Phase 1: scrape + score + enrich, return { candidates, subject } without calling OpenAI. */
   const mode = searchParams.get("mode") === "candidates" ? "candidates" : "full";
-  /** Comma-separated redfin URLs the user picked in the map UI; if present, restrict Claude's input to those. */
+  /** Comma-separated Redfin URLs the user picked in the map UI; if present, restrict the model's input to those. */
   const selectedUrlsRaw = searchParams.get("selectedUrls");
   const selectedUrlSet = selectedUrlsRaw
     ? new Set(selectedUrlsRaw.split(",").map((s) => s.trim()).filter(Boolean))
@@ -325,13 +410,13 @@ export async function POST(
     );
   }
   const model = modelParam as ValidModel;
-  // Opus 4.7+ deprecates the temperature param. Build per-model request opts.
-  const supportsTemperature = !model.startsWith("claude-opus-4-7");
   const baseRequest = {
     model,
-    max_tokens: 8192,
-    ...(supportsTemperature ? { temperature: 0 } : {}),
-    system: SYSTEM_PROMPT,
+    instructions: SYSTEM_PROMPT,
+    max_output_tokens: 12_000,
+    reasoning: { effort: "medium" as const },
+    store: false,
+    text: { format: COMPS_RESPONSE_FORMAT },
   };
 
   // Fetch candidate home
@@ -365,7 +450,10 @@ export async function POST(
       .limit(1)
       .maybeSingle();
 
-    if (cached) {
+    const cachedResult = cached?.comps as CompsResult | undefined;
+    const isCurrentPricingMethod =
+      cachedResult?.estimate?.pricing_methodology?.version === PRICING_METHOD_VERSION;
+    if (cached && isCurrentPricingMethod) {
       if (stream) {
         const encoder = new TextEncoder();
         const body = new ReadableStream({
@@ -393,8 +481,8 @@ export async function POST(
   }
 
   // Check for API key early
-  if (!process.env.ANTHROPIC_API_KEY) {
-    const msg = "ANTHROPIC_API_KEY is not set in .env.local";
+  if (!process.env.OPENAI_API_KEY) {
+    const msg = "OPENAI_API_KEY is not set in .env.local";
     if (stream) {
       const encoder = new TextEncoder();
       const body = new ReadableStream({
@@ -424,7 +512,7 @@ export async function POST(
 
   // --- Scrape real comp data (before streaming/non-streaming branch) ---
   const zip = extractZip(address);
-  let scrapeResult: ScrapeResult = { comps: [], source: "claude-knowledge" };
+  let scrapeResult: ScrapeResult = { comps: [], source: "model-knowledge" };
   const scrapeLog = (msg: string) => console.log(`[Scraper] ${msg}`);
 
   if (zip) {
@@ -436,8 +524,8 @@ export async function POST(
   // --- Pre-score comps deterministically (1A + 1C/1D enrichment, 2D trend) ---
   let scoredComps: ScoredComp[] = [];
   let candidatesForUI: ScoredComp[] = [];
+  let marketCompsForPricing: PricingComp[] = [];
   let enrichedSubject: SubjectGeo | null = null;
-  let monthlyDriftPct = 0;
   const enrichmentInfo = { attempted: 0, fetched: 0, ms: 0 };
   if (scrapeResult.comps.length > 0) {
     const subjectGeo: SubjectGeo = {
@@ -508,27 +596,16 @@ export async function POST(
               : c;
           });
 
-          // 2D — compute trend from the (full, unenriched) pool. Strict gating means it usually returns 0.
-          const trend = computeTrendFromComps(scrapeResult.comps, new Date(), 12);
-          monthlyDriftPct = trend.monthly_drift_pct;
-
-          // Time-adjust comp prices when trend is non-zero.
-          const adjustedPool: RawComp[] =
-            monthlyDriftPct !== 0
-              ? enrichedPool.map((c) => ({
-                  ...c,
-                  sold_price: timeAdjustPrice(c.sold_price, c.sold_date, new Date(), monthlyDriftPct),
-                }))
-              : enrichedPool;
-
-          const finalScored = scoreComps(subjectGeo, adjustedPool, new Date());
+          const finalScored = scoreComps(subjectGeo, enrichedPool, new Date());
           scoredComps = finalScored.slice(0, TOP_N_FOR_PROMPT);
           candidatesForUI = finalScored.slice(0, 30);
+          marketCompsForPricing = buildMarketPricingComps(enrichedPool, subjectGeo);
           enrichedSubject = subjectGeo;
         } else {
           console.log("[Enrichment] Budget exceeded — proceeding with base scoring");
           scoredComps = baseScored.slice(0, TOP_N_FOR_PROMPT);
           candidatesForUI = baseScored.slice(0, 30);
+          marketCompsForPricing = buildMarketPricingComps(scrapeResult.comps, subjectGeo);
           enrichedSubject = subjectGeo;
         }
       } catch (err) {
@@ -537,11 +614,12 @@ export async function POST(
         );
         scoredComps = baseScored.slice(0, TOP_N_FOR_PROMPT);
         candidatesForUI = baseScored.slice(0, 30);
+        marketCompsForPricing = buildMarketPricingComps(scrapeResult.comps, subjectGeo);
         enrichedSubject = subjectGeo;
       }
 
       console.log(
-        `[Scoring] ${baseScored.length} comps in window, enrichment ${enrichmentInfo.fetched}/${enrichmentInfo.attempted} in ${enrichmentInfo.ms}ms, top ${scoredComps.length} sent to Claude (trend ${monthlyDriftPct.toFixed(2)}%/mo)`,
+        `[Scoring] ${baseScored.length} comps in window, enrichment ${enrichmentInfo.fetched}/${enrichmentInfo.attempted} in ${enrichmentInfo.ms}ms, top ${scoredComps.length} sent to OpenAI`,
       );
     } else {
       console.log("[Scoring] Subject sqft unknown — falling back to unscored prompt");
@@ -551,6 +629,7 @@ export async function POST(
   if (mode === "candidates") {
     return NextResponse.json({
       candidates: candidatesForUI.map(toCandidate),
+      pricing_market_comps: marketCompsForPricing,
       subject: {
         address,
         sqft: typeof subjectSqft === "number" ? subjectSqft : 0,
@@ -563,26 +642,28 @@ export async function POST(
       },
       scrape_source: scrapeResult.source,
       enrichment: enrichmentInfo,
-      monthly_drift_pct: monthlyDriftPct,
     });
   }
 
-  // Phase 2: if the user selected a specific subset on the map, restrict Claude's input to that set
+  // Phase 2: if the user selected a specific subset on the map, restrict the model's input to that set
   // (preserve the user's selection order so the LLM sees them ranked the same way they were chosen).
   if (selectedUrlSet && selectedUrlSet.size > 0) {
-    const filtered = scoredComps.filter((c) => c.redfin_url && selectedUrlSet.has(c.redfin_url));
-    if (filtered.length > 0) {
-      scoredComps = filtered;
-    } else {
-      // The user picked URLs not present in the top-N pool — re-score the full pool and pull them in.
-      // This handles the case where Phase 1 returned a wider candidate set than TOP_N_FOR_PROMPT.
-      const fallback = candidatesForUI.filter((c) => c.redfin_url && selectedUrlSet.has(c.redfin_url));
-      if (fallback.length > 0) scoredComps = fallback;
+    // Phase 1 exposes more candidates than the normal prompt pool. Always filter
+    // that wider set so a checked lower-ranked row is never silently ignored.
+    const selectedCandidates = candidatesForUI.filter(
+      (c) => c.redfin_url && selectedUrlSet.has(c.redfin_url),
+    );
+    if (selectedCandidates.length > 0) scoredComps = selectedCandidates;
+    // A manual selection is an explicit pricing decision. Restrict the
+    // deterministic market pool as well as the model prompt so the final report
+    // matches the live estimate shown beside the checkboxes.
+    if (enrichedSubject && scoredComps.length > 0) {
+      marketCompsForPricing = buildMarketPricingComps(scoredComps, enrichedSubject);
     }
     console.log(`[Scoring] User-selected subset: ${scoredComps.length} comps`);
   }
 
-  // Build prompt: pre-scored comps if scoring succeeded, otherwise Claude knowledge (unverified)
+  // Build prompt: pre-scored comps if scoring succeeded, otherwise model knowledge (unverified)
   const userPrompt =
     scoredComps.length > 0
       ? buildVerifiedCompsPrompt({
@@ -598,32 +679,33 @@ export async function POST(
 
   // Non-streaming mode
   if (!stream) {
-    const anthropic = new Anthropic();
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     let rawResponse: string;
     try {
-      const message = await anthropic.messages.create({
+      const response = await openai.responses.create({
         ...baseRequest,
-        messages: [{ role: "user", content: userPrompt }],
+        input: userPrompt,
       });
-      const textBlock = message.content.find((b) => b.type === "text");
-      if (!textBlock || textBlock.type !== "text") {
-        return NextResponse.json({ error: "No text response from Claude" }, { status: 502 });
+      rawResponse = response.output_text;
+      if (!rawResponse) {
+        return NextResponse.json({ error: "No structured response from OpenAI" }, { status: 502 });
       }
-      rawResponse = textBlock.text;
     } catch (err) {
-      return NextResponse.json({ error: err instanceof Error ? err.message : "Claude API call failed" }, { status: 502 });
+      return NextResponse.json({ error: err instanceof Error ? err.message : "OpenAI API call failed" }, { status: 502 });
     }
 
     let compsResult: CompsResult;
     try {
-      compsResult = extractJSON(rawResponse) as CompsResult;
+      compsResult = JSON.parse(rawResponse) as CompsResult;
     } catch {
-      return NextResponse.json({ error: "Failed to parse Claude response as JSON", raw: rawResponse }, { status: 502 });
+      return NextResponse.json({ error: "Failed to parse OpenAI structured response", raw: rawResponse }, { status: 502 });
     }
 
     compsResult = applyDeterministicEstimate(
       compsResult,
       typeof subjectSqft === "number" ? subjectSqft : compsResult.subject?.sqft ?? 0,
+      zip,
+      marketCompsForPricing,
     );
     if (candidatesForUI.length > 0) {
       compsResult = { ...compsResult, candidates: candidatesForUI.map(toCandidate) };
@@ -683,10 +765,7 @@ export async function POST(
           if (enrichmentInfo.attempted > 0) {
             send("log", { message: `Enriched ${enrichmentInfo.fetched}/${enrichmentInfo.attempted} listings with neighborhood/school/renovation facts (${enrichmentInfo.ms}ms)` });
           }
-          if (monthlyDriftPct !== 0) {
-            send("log", { message: `Market trend (data-driven): ${monthlyDriftPct >= 0 ? "+" : ""}${monthlyDriftPct.toFixed(2)}%/mo — comp prices time-adjusted` });
-          }
-          send("log", { message: `Pre-scored top ${scoredComps.length} sent to Claude` });
+          send("log", { message: `Pre-scored top ${scoredComps.length} sent to OpenAI` });
           const top3 = scoredComps.slice(0, 3);
           for (const c of top3) {
             const tags: string[] = [];
@@ -697,26 +776,27 @@ export async function POST(
           }
         } else if (scrapeResult.comps.length > 0) {
           send("log", { message: `Data source: ${scrapeResult.comps.length} verified comps from ${scrapeResult.source}` });
-          send("log", { message: "Pre-scoring skipped (subject sqft unknown) — Claude will rank using its knowledge" });
+          send("log", { message: "Pre-scoring skipped (subject sqft unknown) — OpenAI will rank using model knowledge" });
         } else {
-          send("log", { message: "Data source: Claude knowledge (unverified) — scraping unavailable" });
+          send("log", { message: "Data source: model knowledge (unverified) — scraping unavailable" });
         }
 
         send("log", { message: "" });
-        send("log", { message: `Connecting to Claude API (${model})...` });
+        send("log", { message: `Connecting to OpenAI API (${model})...` });
 
-        const anthropic = new Anthropic();
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
         let rawResponse = "";
 
-        send("log", { message: "Streaming response from Claude..." });
+        send("log", { message: "Streaming structured response from OpenAI..." });
 
-        const sseStream = anthropic.messages.stream({
+        const openaiStream = await openai.responses.create({
           ...baseRequest,
-          messages: [{ role: "user", content: userPrompt }],
+          input: userPrompt,
+          stream: true,
         }, { signal: abortController.signal });
 
-        let tokenCount = 0;
-        for await (const event of sseStream) {
+        let chunkCount = 0;
+        for await (const event of openaiStream) {
           if (abortController.signal.aborted) {
             send("log", { message: "Analysis stopped by user" });
             send("done", {});
@@ -724,22 +804,28 @@ export async function POST(
             return;
           }
 
-          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-            rawResponse += event.delta.text;
-            tokenCount += 1;
-            send("token", { text: event.delta.text });
-            if (tokenCount % 100 === 0) {
-              send("log", { message: `Generating... (${tokenCount} tokens)` });
+          if (event.type === "response.output_text.delta") {
+            rawResponse += event.delta;
+            chunkCount += 1;
+            send("token", { text: event.delta });
+            if (chunkCount % 100 === 0) {
+              send("log", { message: `Generating... (${chunkCount} chunks)` });
             }
+          } else if (event.type === "response.failed") {
+            throw new Error(event.response.error?.message ?? "OpenAI response failed");
+          } else if (event.type === "response.incomplete") {
+            throw new Error(
+              `OpenAI response incomplete: ${event.response.incomplete_details?.reason ?? "unknown reason"}`,
+            );
           }
         }
 
-        send("log", { message: `Response complete (${tokenCount} tokens)` });
+        send("log", { message: `Response complete (${chunkCount} chunks)` });
         send("log", { message: "Parsing JSON response..." });
 
         let compsResult: CompsResult;
         try {
-          compsResult = extractJSON(rawResponse) as CompsResult;
+          compsResult = JSON.parse(rawResponse) as CompsResult;
         } catch (parseErr) {
           const parseMsg = parseErr instanceof Error ? parseErr.message : "Invalid JSON";
           send("log", { message: `ERROR: ${parseMsg}` });
@@ -756,6 +842,8 @@ export async function POST(
         compsResult = applyDeterministicEstimate(
           compsResult,
           typeof subjectSqft === "number" ? subjectSqft : compsResult.subject?.sqft ?? 0,
+          zip,
+          marketCompsForPricing,
         );
         if (candidatesForUI.length > 0) {
           compsResult = { ...compsResult, candidates: candidatesForUI.map(toCandidate) };
@@ -774,10 +862,10 @@ export async function POST(
 
         if (compsResult.estimate) {
           send("log", { message: `Computed estimate from ${compsCount} comps (deterministic)` });
-          send("log", { message: `Weighted $/sqft: $${compsResult.estimate.weighted_price_per_sqft?.toLocaleString()}` });
-          send("log", { message: `Comp-based estimate: $${compsResult.estimate.comp_based?.toLocaleString()}` });
-          send("log", { message: `Market temperature: ${compsResult.estimate.market_temperature} (${compsResult.estimate.trend_adjustment_pct >= 0 ? "+" : ""}${compsResult.estimate.trend_adjustment_pct}%)` });
-          send("log", { message: `Trend-adjusted estimate: $${compsResult.estimate.trend_adjusted?.toLocaleString()}` });
+          const method = compsResult.estimate.pricing_methodology;
+          send("log", { message: `Nearby baseline: ${method?.nearby_transaction_count ?? 0} sales within 0.5mi at $${compsResult.estimate.weighted_price_per_sqft?.toLocaleString()}/sqft` });
+          send("log", { message: `Current ZIP signal: ${method?.recent_zip_transaction_count ?? 0} sales in 14 days (${method?.recent_zip_weight_pct ?? 0}% weight)` });
+          send("log", { message: `Current-market estimate: $${compsResult.estimate.trend_adjusted?.toLocaleString()}` });
         }
 
         send("log", { message: "" });

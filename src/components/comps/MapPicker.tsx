@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, Tooltip, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import type { CompHomeWithGeo, CompsEstimate } from "@/lib/types";
@@ -109,6 +109,7 @@ interface MapPickerProps {
   candidates: CompHomeWithGeo[];
   /** redfin_urls of comps initially selected (typically the algorithm's top 8). */
   initialSelectedUrls: string[];
+  marketTemperature?: CompsEstimate["market_temperature"];
   onEstimateChange?: (e: CompsEstimate | null) => void;
   /** Notified whenever the selection changes — parent typically lifts the set into URL params for Phase 2. */
   onSelectionChange?: (urls: Set<string>) => void;
@@ -118,6 +119,10 @@ function formatMoney(n: number): string {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 1_000) return `$${Math.round(n / 1_000)}K`;
   return `$${n.toLocaleString()}`;
+}
+
+function extractZip(address: string): string | null {
+  return address.match(/\b(\d{5})(?:-\d{4})?\b/)?.[1] ?? null;
 }
 
 function FitBounds({ points }: { points: [number, number][] }) {
@@ -136,11 +141,12 @@ function FitBounds({ points }: { points: [number, number][] }) {
   return null;
 }
 
-export default function MapPicker({ subject, candidates, initialSelectedUrls, onEstimateChange, onSelectionChange }: MapPickerProps) {
+export default function MapPicker({ subject, candidates, initialSelectedUrls, marketTemperature = "warm", onEstimateChange, onSelectionChange }: MapPickerProps) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set(initialSelectedUrls));
   const [estimate, setEstimate] = useState<CompsEstimate | null>(null);
   const [manualComps, setManualComps] = useState<CompHomeWithGeo[]>([]);
   const [manualOpen, setManualOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const [manualForm, setManualForm] = useState({
     address: "",
     sold_price: "",
@@ -195,11 +201,13 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
     () => (subject.latitude != null && subject.longitude != null ? { lat: subject.latitude, lng: subject.longitude } : null),
     [subject.latitude, subject.longitude],
   );
-  const distanceFor = (c: CompHomeWithGeo): number | null =>
-    haversineMiles(
+  const distanceFor = useCallback(
+    (c: CompHomeWithGeo): number | null => haversineMiles(
       subjectLatLng,
       c.latitude != null && c.longitude != null ? { lat: c.latitude, lng: c.longitude } : null,
-    );
+    ),
+    [subjectLatLng],
+  );
 
   type SortKey = "selected" | "address" | "specs" | "price" | "ppsf" | "score" | "distance";
   const [sortKey, setSortKey] = useState<SortKey>("score");
@@ -255,6 +263,21 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allCandidates, sortKey, sortDir, selected, subject.latitude, subject.longitude]);
 
+  // Keep the initial view focused: show the strongest eight suggestions plus any
+  // additional rows the user has explicitly checked. The map still plots the
+  // complete candidate pool.
+  const visibleCandidates = useMemo(() => {
+    if (showAll) return sortedCandidates;
+    const shortlist = sortedCandidates.slice(0, 8);
+    const visibleUrls = new Set(shortlist.map((c) => c.redfin_url).filter(Boolean));
+    return [
+      ...shortlist,
+      ...sortedCandidates.filter(
+        (c) => c.redfin_url && selected.has(c.redfin_url) && !visibleUrls.has(c.redfin_url),
+      ),
+    ];
+  }, [showAll, sortedCandidates, selected]);
+
   const closestN = useMemo(
     () =>
       [...allCandidates]
@@ -275,7 +298,14 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
   };
 
   const selectTopK = (k: number) => {
-    setSelected(new Set(sortedCandidates.slice(0, k).map((c) => c.redfin_url).filter(Boolean) as string[]));
+    const topByScore = [...allCandidates]
+      .sort(
+        (a, b) =>
+          (b.total_score ?? b.similarity_score ?? 0) -
+          (a.total_score ?? a.similarity_score ?? 0),
+      )
+      .slice(0, k);
+    setSelected(new Set(topByScore.map((c) => c.redfin_url).filter(Boolean) as string[]));
   };
 
   const selectClosestN = (n: number) => {
@@ -335,10 +365,16 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
           body: JSON.stringify({
             subjectSqft: subject.sqft,
             subjectLotSqft: subject.lot_sqft ?? null,
+            subjectZip: extractZip(subject.address),
+            marketTemperature,
             comps: picked.map((c) => ({
+              address: c.address,
+              zip_code: c.zip_code ?? extractZip(c.address),
               sold_price: c.sold_price,
+              sold_date: c.sold_date,
               sqft: c.sqft,
               similarity_score: c.total_score ?? c.similarity_score ?? 0.5,
+              distance_miles: distanceFor(c) ?? undefined,
               lot_sqft: c.lot_sqft,
             })),
           }),
@@ -356,7 +392,7 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [selected, allCandidates, subject.sqft, subject.lot_sqft, onEstimateChange]);
+  }, [selected, allCandidates, marketTemperature, subject.address, subject.sqft, subject.lot_sqft, distanceFor, onEstimateChange]);
 
   return (
     <div className="border rounded-lg overflow-hidden bg-white shadow-sm">
@@ -388,9 +424,9 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
       `}</style>
       <div className="px-4 py-3 border-b bg-gray-50 flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <div className="font-semibold text-sm">Comp picker</div>
+          <div className="font-semibold text-sm">Choose comparable sales</div>
           <div className="text-xs text-gray-600">
-            {selected.size} of {candidates.length} selected · hover a pin to preview · click to toggle
+            {selected.size} of {allCandidates.length} selected · check a row or click a map pin to fine-tune
           </div>
         </div>
         <div className="flex items-center gap-3 text-xs">
@@ -527,7 +563,7 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
           </MapContainer>
         </div>
 
-        {/* LIST below the map */}
+        {/* SHORTLIST below the map */}
         <div className="bg-white max-h-[420px] overflow-auto">
           <table className="w-full text-xs">
             <thead className="bg-gray-50 sticky top-0">
@@ -535,6 +571,7 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
                 <th className="px-3 py-2 w-8 cursor-pointer hover:bg-gray-100" onClick={() => onSort("selected")} title="Sort by selection">✓{sortIndicator("selected")}</th>
                 <th className="px-2 py-2 cursor-pointer hover:bg-gray-100" onClick={() => onSort("address")}>Address{sortIndicator("address")}</th>
                 <th className="px-2 py-2 cursor-pointer hover:bg-gray-100" onClick={() => onSort("specs")}>Bd/Ba · Sqft · Yr{sortIndicator("specs")}</th>
+                <th className="px-2 py-2">Sold</th>
                 <th className="px-2 py-2 text-right cursor-pointer hover:bg-gray-100" onClick={() => onSort("price")}>Price{sortIndicator("price")}</th>
                 <th className="px-2 py-2 text-right cursor-pointer hover:bg-gray-100" onClick={() => onSort("ppsf")}>$/sf{sortIndicator("ppsf")}</th>
                 <th className="px-2 py-2 text-right cursor-pointer hover:bg-gray-100" onClick={() => onSort("score")}>Score{sortIndicator("score")}</th>
@@ -557,8 +594,9 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
                 <td className="px-2 py-2 text-right text-gray-400">—</td>
                 <td className="px-2 py-2 text-right text-gray-400">—</td>
                 <td className="px-2 py-2 text-right text-gray-400">—</td>
+                <td className="px-2 py-2 text-right text-gray-400">—</td>
               </tr>
-              {sortedCandidates.map((c) => {
+              {visibleCandidates.map((c) => {
                 const isSelected = c.redfin_url ? selected.has(c.redfin_url) : false;
                 const isManual = c.redfin_url?.startsWith("manual-");
                 return (
@@ -570,6 +608,7 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
                     <td className="px-3 py-2">
                       <input
                         type="checkbox"
+                        aria-label={`${isSelected ? "Exclude" : "Include"} ${c.address}`}
                         checked={isSelected}
                         onChange={() => c.redfin_url && toggle(c.redfin_url)}
                         onClick={(e) => e.stopPropagation()}
@@ -577,7 +616,17 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
                     </td>
                     <td className="px-2 py-2 truncate max-w-[220px]">
                       <div className="font-medium flex items-center gap-1">
-                        {c.address.split(",")[0]}
+                        {c.redfin_url && !isManual ? (
+                          <a
+                            href={c.redfin_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-neutral-900 underline decoration-neutral-300 underline-offset-2 hover:text-[#b8890f]"
+                          >
+                            {c.address.split(",")[0]}
+                          </a>
+                        ) : c.address.split(",")[0]}
                         {isManual && <span className="text-[9px] uppercase tracking-wider px-1 py-0.5 bg-blue-100 text-blue-700 rounded">manual</span>}
                       </div>
                       <div className="text-gray-500">{c.city ?? c.address.split(",")[1]?.trim()}</div>
@@ -599,6 +648,7 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
                         </>
                       )}
                     </td>
+                    <td className="px-2 py-2 whitespace-nowrap text-gray-500">{c.sold_date || "—"}</td>
                     <td className="px-2 py-2 text-right">{formatMoney(c.sold_price)}</td>
                     <td className="px-2 py-2 text-right">${Math.round(c.price_per_sqft)}</td>
                     <td className="px-2 py-2 text-right">{(c.total_score ?? c.similarity_score ?? 0).toFixed(2)}</td>
@@ -606,9 +656,9 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
                   </tr>
                 );
               })}
-              {sortedCandidates.length === 0 && (
+              {visibleCandidates.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-3 py-4 text-center text-gray-500">
+                  <td colSpan={8} className="px-3 py-4 text-center text-gray-500">
                     No candidates
                   </td>
                 </tr>
@@ -616,6 +666,20 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
             </tbody>
           </table>
         </div>
+        {sortedCandidates.length > 8 && (
+          <div className="bg-white border-t px-4 py-2 flex items-center justify-between text-xs text-gray-500">
+            <span>
+              Showing {visibleCandidates.length} of {sortedCandidates.length} candidates
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowAll((value) => !value)}
+              className="font-medium text-neutral-800 hover:text-[#b8890f]"
+            >
+              {showAll ? "Show shortlist" : `Show all ${sortedCandidates.length}`}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="px-4 py-3 border-t bg-gray-50 text-sm">
@@ -625,12 +689,12 @@ export default function MapPicker({ subject, candidates, initialSelectedUrls, on
         ) : estimate ? (
           <div className="flex flex-wrap gap-x-6 gap-y-1">
             <div>
-              <span className="text-gray-500">Estimate: </span>
-              <span className="font-semibold">{formatMoney(estimate.comp_based)}</span>
+              <span className="text-gray-500">Tuned estimate: </span>
+              <span className="font-semibold">{formatMoney(estimate.trend_adjusted)}</span>
             </div>
             <div>
               <span className="text-gray-500">$/sqft: </span>
-              <span className="font-semibold">${estimate.weighted_price_per_sqft.toLocaleString()}</span>
+              <span className="font-semibold">${(estimate.current_price_per_sqft ?? estimate.weighted_price_per_sqft).toLocaleString()}</span>
             </div>
             <div>
               <span className="text-gray-500">Most likely: </span>

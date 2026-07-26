@@ -61,7 +61,7 @@ console.log(`Raw comps after filter: ${raw.length}`);
 const scored = scoreComps(subject, raw, new Date("2026-04-26"));
 const top10 = scored.slice(0, 10);
 
-console.log(`\nTop 10 (1A pipeline) — sent to Claude:\n`);
+console.log(`\nTop 10 (1A pipeline) — sent to the model:\n`);
 console.log("  Score | Date       | Address                                  | Price   | Sqft | $/sf  | Dist  | Tier | Sim  | Rec");
 console.log("  ------+------------+------------------------------------------+---------+------+-------+-------+------+------+-----");
 top10.forEach((c) =>

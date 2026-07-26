@@ -292,6 +292,7 @@ function scoreCompsInternal(
 
     // Distance
     let distance_miles = 0;
+    let distance_known = false;
     let distance_score = 1; // neutral if either side missing
     if (
       subject.latitude != null &&
@@ -299,6 +300,7 @@ function scoreCompsInternal(
       c.latitude != null &&
       c.longitude != null
     ) {
+      distance_known = true;
       distance_miles = haversineMiles(
         { lat: subject.latitude, lng: subject.longitude },
         { lat: c.latitude, lng: c.longitude },
@@ -385,6 +387,7 @@ function scoreCompsInternal(
       lot_score,
       era_score,
       distance_miles,
+      distance_known,
       distance_score,
       tier_score,
       neighborhood_score,

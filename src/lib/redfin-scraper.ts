@@ -1,6 +1,9 @@
 import type { RawComp, ScrapeResult } from "./types";
 
-const MAX_COMPS = 60;
+// Redfin orders the CSV by days-on-market, not by sale date. Request and parse a
+// broad pool so we do not discard the newest ZIP sales or close-by older sales
+// before the deterministic scorer gets a chance to rank them.
+const MAX_COMPS = 350;
 const SCRAPE_TIMEOUT = 20_000; // 20s total for all scraping attempts
 
 // Approximate bounding boxes for zip codes (lat/long).
@@ -148,7 +151,7 @@ export async function scrapeWithRedfinApi(
   }
 
   const poly = buildPolyParam(bounds);
-  const csvUrl = `https://www.redfin.com/stingray/api/gis-csv?al=1&num_homes=${MAX_COMPS + 10}&ord=days-on-redfin-asc&page_number=1&sold_within_days=365&status=9&uipt=1&v=8&poly=${encodeURIComponent(poly)}`;
+  const csvUrl = `https://www.redfin.com/stingray/api/gis-csv?al=1&num_homes=${MAX_COMPS}&ord=days-on-redfin-asc&page_number=1&sold_within_days=365&status=9&uipt=1&v=8&poly=${encodeURIComponent(poly)}`;
 
   info(`Fetching Redfin CSV API for zip ${zip}...`);
 
@@ -188,7 +191,8 @@ export async function scrapeWithRedfinApi(
       const property_type = (cols[2] ?? "").trim() || null;
       const sold_date = parseRedfinDate(cols[1] ?? "");
       const city = (cols[4] ?? "").trim() || null;
-      const address = `${cols[3] ?? ""}, ${cols[4] ?? ""}, ${cols[5] ?? ""} ${cols[6] ?? ""}`.trim();
+      const zip_code = (cols[6] ?? "").trim() || null;
+      const address = `${cols[3] ?? ""}, ${cols[4] ?? ""}, ${cols[5] ?? ""} ${zip_code ?? ""}`.trim();
       const sold_price = parseFloat((cols[7] ?? "0").replace(/[^0-9.]/g, "")) || 0;
       const beds = parseInt(cols[8] ?? "0") || 0;
       const baths = parseFloat(cols[9] ?? "0") || 0;
@@ -202,6 +206,7 @@ export async function scrapeWithRedfinApi(
       if (address && sold_price > 0 && sqft > 0) {
         comps.push({
           address,
+          zip_code,
           sold_price,
           sold_date,
           sqft,
@@ -221,8 +226,14 @@ export async function scrapeWithRedfinApi(
     }
   }
 
-  info(`Parsed ${comps.length} valid comps from Redfin CSV`);
-  return comps.slice(0, MAX_COMPS);
+  const newestFirst = comps.sort((a, b) => {
+    const aTime = a.sold_date ? Date.parse(`${a.sold_date}T12:00:00Z`) : 0;
+    const bTime = b.sold_date ? Date.parse(`${b.sold_date}T12:00:00Z`) : 0;
+    return bTime - aTime;
+  });
+
+  info(`Parsed ${newestFirst.length} valid comps from Redfin CSV`);
+  return newestFirst.slice(0, MAX_COMPS);
 }
 
 /**
@@ -250,7 +261,7 @@ function parseCSVLine(line: string): string[] {
 
 /**
  * Main entry point: scrape recently sold comps for a zip code.
- * Fallback chain: Redfin CSV API → empty (caller uses Claude knowledge).
+ * Fallback chain: Redfin CSV API → empty (caller uses model knowledge).
  * Overall timeout: 20 seconds for all attempts combined.
  */
 export async function scrapeComps(
@@ -274,8 +285,8 @@ export async function scrapeComps(
     }
 
     // 2. All scrapers failed
-    info("All scrapers failed — will fall back to Claude knowledge (unverified)");
-    return { comps: [], source: "claude-knowledge" };
+    info("All scrapers failed — will fall back to model knowledge (unverified)");
+    return { comps: [], source: "model-knowledge" };
   }
 
   // Wrap entire pipeline in a timeout
@@ -283,6 +294,6 @@ export async function scrapeComps(
     return await withTimeout(tryAll(), SCRAPE_TIMEOUT, "Scraping pipeline");
   } catch (err) {
     info(`Scraping timed out: ${err instanceof Error ? err.message : String(err)}`);
-    return { comps: [], source: "claude-knowledge" };
+    return { comps: [], source: "model-knowledge" };
   }
 }
