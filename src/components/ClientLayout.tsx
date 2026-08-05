@@ -376,34 +376,6 @@ export function Footer() {
         </div>
       </div>
 
-      {/* Newsletter Signup CTA */}
-      <div className="border-t border-neutral-200">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 py-10">
-          <div className="flex flex-col md:flex-row md:items-center gap-6">
-            <div className="md:w-1/3">
-              <h4 className={`${playfair.className} text-xl font-normal text-neutral-900 mb-1`}>Stay Updated</h4>
-              <p className="text-neutral-500 text-sm">
-                Create an account to receive daily Bay Area listings in the cities you choose.
-              </p>
-            </div>
-            <div className="md:flex-1 flex flex-col sm:flex-row gap-3 sm:items-center">
-              <Link
-                href="/signup"
-                className="inline-block px-8 py-3 bg-[#d4a012] text-white text-xs font-medium uppercase tracking-widest hover:bg-[#b8890f] transition-colors whitespace-nowrap text-center"
-              >
-                Create Account
-              </Link>
-              <Link
-                href="/login"
-                className="text-neutral-500 hover:text-[#d4a012] text-sm uppercase tracking-wider text-center"
-              >
-                Already a member? Sign in
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Bottom Bar */}
       <div className="border-t border-neutral-200">
         <div className="max-w-7xl mx-auto px-6 lg:px-8 py-6 flex flex-col sm:flex-row justify-between items-center gap-4">
