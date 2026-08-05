@@ -57,6 +57,11 @@ export default async function ListingPage({
                 <span className="w-2 h-2 bg-[#166534] rounded-full animate-pulse" />
                 FOR SALE
               </span>
+            ) : listing.status === "pending" ? (
+              <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#d4a012] text-white font-bold text-sm rounded-xl shadow-lg">
+                <span className="w-2 h-2 bg-white rounded-full" />
+                PENDING
+              </span>
             ) : (
               <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#166534] text-white font-bold text-sm rounded-xl shadow-lg">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
