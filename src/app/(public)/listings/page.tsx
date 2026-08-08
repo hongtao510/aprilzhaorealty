@@ -119,7 +119,7 @@ export default function ListingsPage() {
               <div>
                 <p className="text-[#d4a012] text-xs uppercase tracking-[0.3em] mb-2">Closed Transactions</p>
                 <h2 className="font-serif text-3xl text-neutral-900">
-                  Successfully Sold Homes
+                  Recently Sold Homes
                 </h2>
               </div>
             </div>
