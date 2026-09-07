@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { safeRedirectPath } from "@/lib/safe-redirect";
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -62,8 +63,10 @@ function LoginForm() {
       // Timeout or network error — fall through to default destination
     }
 
-    const destination =
-      redirect || (role === "admin" ? "/admin" : "/portal");
+    const destination = safeRedirectPath(
+      redirect,
+      role === "admin" ? "/admin" : "/portal"
+    );
     router.push(destination);
     router.refresh();
   }

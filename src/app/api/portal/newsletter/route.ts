@@ -103,7 +103,11 @@ export async function POST(request: NextRequest) {
     .eq("id", user.id)
     .single();
 
-  const { error } = await supabase
+  // The public profiles table intentionally has no blanket self-update policy.
+  // Use the service role only after authenticating the user, and allowlist every
+  // field that this endpoint is permitted to change.
+  const admin = createAdminClient();
+  const { error } = await admin
     .from("profiles")
     .update({
       newsletter_cities: unique,
@@ -137,7 +141,6 @@ export async function POST(request: NextRequest) {
         cities: unique,
       });
       // Mark as notified so subsequent saves don't re-ping
-      const admin = createAdminClient();
       await admin
         .from("profiles")
         .update({ newsletter_notified_at: new Date().toISOString() })

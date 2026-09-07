@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useState, useEffect, useCallback } from "react";
-import { getListings, formatPrice, getTestimonials } from "@/lib/data";
+import { useState, useEffect } from "react";
+import { getListings, formatPrice } from "@/lib/data";
 import ScrollReveal from "@/components/ScrollReveal";
 
 // Bay Area neighborhoods data
@@ -92,30 +92,32 @@ export default function Home() {
   // Filter listings that have images for the carousel
   const listingsWithImages = allListings.filter((listing) => listing.images.length > 0);
   const carouselListings = listingsWithImages.slice(0, 8); // Show up to 8 listings in carousel
+  const carouselCount = carouselListings.length;
   const activeListings = allListings.filter((l) => l.status === "active");
   const recentListings = allListings.filter((l) => l.status === "sold" || l.status === "pending").slice(0, 9);
 
   const [currentSlide, setCurrentSlide] = useState(0);
 
-  const nextSlide = useCallback(() => {
-    setCurrentSlide((prev) => (prev + 1) % carouselListings.length);
-  }, [carouselListings.length]);
+  const nextSlide = () => {
+    if (carouselCount > 0) {
+      setCurrentSlide((prev) => (prev + 1) % carouselCount);
+    }
+  };
 
-  const prevSlide = useCallback(() => {
-    setCurrentSlide((prev) => (prev - 1 + carouselListings.length) % carouselListings.length);
-  }, [carouselListings.length]);
-
-  const goToSlide = (index: number) => {
-    setCurrentSlide(index);
+  const prevSlide = () => {
+    if (carouselCount > 0) {
+      setCurrentSlide((prev) => (prev - 1 + carouselCount) % carouselCount);
+    }
   };
 
   // Auto-advance carousel
   useEffect(() => {
+    if (carouselCount <= 1) return;
     const timer = setInterval(() => {
-      nextSlide();
+      setCurrentSlide((prev) => (prev + 1) % carouselCount);
     }, 5000);
     return () => clearInterval(timer);
-  }, [nextSlide]);
+  }, [carouselCount]);
 
   return (
     <div>

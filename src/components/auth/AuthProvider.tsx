@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 import type { User, AuthChangeEvent, Session } from "@supabase/supabase-js";
 import type { Profile } from "@/lib/types";
 
@@ -34,14 +35,11 @@ export function AuthProvider({
 }) {
   const [user, setUser] = useState<User | null>(initialUser);
   const [profile, setProfile] = useState<Profile | null>(initialProfile);
-  // SSR already resolved the session (user or null). Start not-loading so
-  // the header renders the correct CTA on first paint instead of flashing
-  // a "···" placeholder for anonymous visitors. Client-side onAuthStateChange
-  // still keeps state fresh on sign-in / sign-out events.
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(!initialUser);
   const supabase = createClient();
+  const router = useRouter();
 
-  async function fetchProfile(userId: string) {
+  async function fetchProfile(userId: string): Promise<Profile | null> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4000);
     try {
@@ -51,9 +49,10 @@ export function AuthProvider({
         .eq("id", userId)
         .single()
         .abortSignal(controller.signal);
-      setProfile(data as Profile | null);
+      return data as Profile | null;
     } catch (err) {
       console.error("fetchProfile failed:", err);
+      return null;
     } finally {
       clearTimeout(timeoutId);
     }
@@ -62,11 +61,8 @@ export function AuthProvider({
   useEffect(() => {
     let mounted = true;
 
-    // Trust the SSR-hydrated initialUser/initialProfile. Don't call
-    // supabase.auth.getUser() on mount — it has been hanging on
-    // navigator.locks contention and blocking every other SDK call
-    // (including exchangeCodeForSession on /reset-password).
-    // onAuthStateChange still catches sign-in / sign-out events at runtime.
+    // INITIAL_SESSION hydrates the UI from browser auth storage. Keeping this
+    // client-side allows public pages to remain static and CDN-cacheable.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
@@ -79,9 +75,15 @@ export function AuthProvider({
           // we can hold the SDK's navigator.locks while other SDK calls
           // are trying to proceed, causing the entire signin-then-redirect
           // flow to deadlock.
-          void fetchProfile(currentUser.id);
+          setLoading(true);
+          void fetchProfile(currentUser.id).then((nextProfile) => {
+            if (!mounted) return;
+            setProfile(nextProfile);
+            setLoading(false);
+          });
         } else {
           setProfile(null);
+          setLoading(false);
         }
       }
     );
@@ -117,7 +119,8 @@ export function AuthProvider({
           document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
         }
       });
-      window.location.assign("/");
+      router.push("/");
+      router.refresh();
     }
   }
 

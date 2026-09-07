@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function GET(
   _request: Request,
@@ -104,8 +105,17 @@ export async function DELETE(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // Delete profile (cascade will handle materials and messages via RLS/triggers)
-  const { error } = await supabase.from("profiles").delete().eq("id", id);
+  if (id === user.id) {
+    return NextResponse.json(
+      { error: "You cannot delete your own admin account" },
+      { status: 400 }
+    );
+  }
+
+  // profiles is a child of auth.users, so the cascade only works when the
+  // parent auth account is deleted. This also removes profile-owned records.
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.deleteUser(id);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });

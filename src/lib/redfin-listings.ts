@@ -35,6 +35,13 @@ export interface CityConfig {
   east: number;
 }
 
+export interface CityScrapeResult {
+  city: string;
+  listings: RedfinListing[];
+  success: boolean;
+  error?: string;
+}
+
 /** Featured cities with bounding boxes for the Redfin API (San Mateo to Redwood City). */
 export const FEATURED_CITIES: CityConfig[] = [
   { name: "San Mateo",     south: 37.530, north: 37.580, west: -122.345, east: -122.280 },
@@ -161,21 +168,22 @@ export async function scrapeListingsForCity(
 }
 
 /**
- * Scrape all 12 featured cities. Returns all listings grouped.
+ * Scrape every featured city and retain whether each request succeeded.
  */
 export async function scrapeAllCities(
   log?: (msg: string) => void,
-): Promise<{ city: string; listings: RedfinListing[] }[]> {
+): Promise<CityScrapeResult[]> {
   const info = log ?? console.log;
-  const results: { city: string; listings: RedfinListing[] }[] = [];
+  const results: CityScrapeResult[] = [];
 
   for (const city of FEATURED_CITIES) {
     try {
       const listings = await scrapeListingsForCity(city, log);
-      results.push({ city: city.name, listings });
+      results.push({ city: city.name, listings, success: true });
     } catch (err) {
-      info(`ERROR scraping ${city.name}: ${err instanceof Error ? err.message : String(err)}`);
-      results.push({ city: city.name, listings: [] });
+      const message = err instanceof Error ? err.message : String(err);
+      info(`ERROR scraping ${city.name}: ${message}`);
+      results.push({ city: city.name, listings: [], success: false, error: message });
     }
 
     // Small delay between requests to avoid rate limiting

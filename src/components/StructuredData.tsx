@@ -10,8 +10,7 @@ export function AgentStructuredData() {
         "@id": "https://aprilzhaohome.com/#agent",
         name: "April Zhao",
         url: "https://aprilzhaohome.com",
-        logo: "https://aprilzhaohome.com/images/logo.png",
-        image: "https://aprilzhaohome.com/images/april-zhao.jpg",
+        logo: "https://aprilzhaohome.com/bq-realty-logo.png",
         description:
           "Your trusted real estate partner in the San Francisco Bay Area. Expert guidance for buying and selling homes in San Jose, San Mateo, Belmont, Redwood City, and surrounding areas.",
         email: "aprilcasf@gmail.com",
@@ -182,7 +181,7 @@ export function AgentStructuredData() {
         url: "https://aprilzhaohome.com",
         logo: {
           "@type": "ImageObject",
-          url: "https://aprilzhaohome.com/images/logo.png",
+          url: "https://aprilzhaohome.com/bq-realty-logo.png",
         },
         contactPoint: {
           "@type": "ContactPoint",

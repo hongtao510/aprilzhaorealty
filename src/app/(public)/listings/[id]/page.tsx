@@ -1,12 +1,30 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import type { Metadata } from "next";
 import { getListing, getListings, formatPrice } from "@/lib/data";
+import { pageMetadata } from "@/lib/site-metadata";
 
 export function generateStaticParams() {
   return getListings().map((listing) => ({
     id: listing.id,
   }));
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const listing = getListing(id);
+  if (!listing) return {};
+  return pageMetadata({
+    title: listing.address,
+    description: `${listing.status === "active" ? "View" : "Explore"} ${listing.address} in ${listing.city}: ${listing.bedrooms} beds, ${listing.bathrooms} baths, ${listing.sqft.toLocaleString()} sq ft.`,
+    path: `/listings/${listing.id}`,
+    image: listing.images[0],
+  });
 }
 
 export default async function ListingPage({

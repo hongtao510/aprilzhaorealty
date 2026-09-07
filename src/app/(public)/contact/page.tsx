@@ -9,6 +9,7 @@ export default function ContactPage() {
     email: "",
     phone: "",
     message: "",
+    website: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -181,6 +182,18 @@ export default function ContactPage() {
               </p>
 
               <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="hidden" aria-hidden="true">
+                  <label htmlFor="website">Website</label>
+                  <input
+                    type="text"
+                    id="website"
+                    name="website"
+                    value={formData.website}
+                    onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                    tabIndex={-1}
+                    autoComplete="off"
+                  />
+                </div>
                 {error && (
                   <div className="p-4 bg-red-50 border border-red-100 text-red-700">
                     <p className="text-sm">{error}</p>
@@ -199,6 +212,7 @@ export default function ContactPage() {
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       className="w-full px-0 py-3 bg-transparent border-0 border-b-2 border-neutral-200 text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-[#d4a012] transition-colors"
                       placeholder="Your name"
+                      maxLength={120}
                       required
                     />
                   </div>
@@ -214,6 +228,7 @@ export default function ContactPage() {
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       className="w-full px-0 py-3 bg-transparent border-0 border-b-2 border-neutral-200 text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-[#d4a012] transition-colors"
                       placeholder="you@example.com"
+                      maxLength={254}
                       required
                     />
                   </div>
@@ -230,6 +245,7 @@ export default function ContactPage() {
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     className="w-full px-0 py-3 bg-transparent border-0 border-b-2 border-neutral-200 text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-[#d4a012] transition-colors"
                     placeholder="(555) 123-4567"
+                    maxLength={40}
                   />
                 </div>
 
@@ -244,6 +260,7 @@ export default function ContactPage() {
                     rows={5}
                     className="w-full px-0 py-3 bg-transparent border-0 border-b-2 border-neutral-200 text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-[#d4a012] transition-colors resize-none"
                     placeholder="Tell me about what you're looking for..."
+                    maxLength={5000}
                     required
                   />
                 </div>

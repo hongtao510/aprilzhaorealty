@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { SavedHome } from "@/lib/types";
 import SavedHomeCard from "@/components/portal/SavedHomeCard";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 /** Extract a clean street address from scraped listing text.
  *  Strips property names, bed/bath counts, sqft, and other metadata. */
 function extractRouteAddress(raw: string): string {
   // Strip bed/bath suffixes  (e.g. "- 2 beds/2.5 baths", "2 bed | 1 bath")
-  let cleaned = raw
+  const cleaned = raw
     .replace(/[-–—]?\s*\d+\.?\d*\s*beds?\s*[/|,]\s*\d+\.?\d*\s*baths?.*/i, "")
     // Strip sqft  (e.g. "- 1,200 sqft", "1200 sq ft")
     .replace(/[-–—]?\s*[\d,]+\s*sq\.?\s*ft\.?.*/i, "")
@@ -27,6 +28,7 @@ function extractRouteAddress(raw: string): string {
 }
 
 export default function SavedHomesPage() {
+  const { profile } = useAuth();
   const [homes, setHomes] = useState<SavedHome[]>([]);
   const [loading, setLoading] = useState(true);
   const [showRoutePlanner, setShowRoutePlanner] = useState(false);
@@ -38,7 +40,6 @@ export default function SavedHomesPage() {
   const [showEmailPanel, setShowEmailPanel] = useState(false);
   const [emailSelectedIds, setEmailSelectedIds] = useState<Set<string>>(new Set());
   const [emailComments, setEmailComments] = useState<Map<string, string>>(new Map());
-  const [recipientEmail, setRecipientEmail] = useState("");
   const [emailSubject, setEmailSubject] = useState("");
   const [emailMessage, setEmailMessage] = useState("");
   const [sendingEmail, setSendingEmail] = useState(false);
@@ -156,7 +157,6 @@ export default function SavedHomesPage() {
       // Opening email panel — select all homes, close route planner
       setEmailSelectedIds(new Set(homes.map((h) => h.id)));
       setEmailComments(new Map());
-      setRecipientEmail("");
       setEmailSubject("");
       setEmailMessage("");
       setEmailSent(false);
@@ -203,18 +203,14 @@ export default function SavedHomesPage() {
 
     const selectedHomes = homes.filter((h) => emailSelectedIds.has(h.id));
     const payload = {
-      recipientEmail,
       subject: emailSubject.trim() || undefined,
       message: emailMessage.trim() || undefined,
-      homes: selectedHomes.map((h) => ({
-        id: h.id,
-        url: h.url,
-        title: h.title,
-        image_url: h.image_url,
-        address: h.address,
-        price: h.price,
-        comment: emailComments.get(h.id) || "",
-      })),
+      homeIds: selectedHomes.map((h) => h.id),
+      comments: Object.fromEntries(
+        selectedHomes
+          .map((home) => [home.id, emailComments.get(home.id) || ""])
+          .filter(([, comment]) => comment)
+      ),
     };
 
     try {
@@ -392,7 +388,7 @@ export default function SavedHomesPage() {
                   </svg>
                   <p className="text-neutral-900 font-medium mb-1">Email Sent!</p>
                   <p className="text-sm text-neutral-500">
-                    {emailSelectedIds.size} home{emailSelectedIds.size === 1 ? "" : "s"} sent to {recipientEmail}
+                    {emailSelectedIds.size} home{emailSelectedIds.size === 1 ? "" : "s"} sent to {profile?.email}
                   </p>
                   <button
                     onClick={() => setShowEmailPanel(false)}
@@ -405,19 +401,12 @@ export default function SavedHomesPage() {
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-col sm:flex-row gap-4">
                     <div className="flex-1">
-                      <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-1.5">
-                        Recipient Email
-                      </label>
-                      <input
-                        type="email"
-                        value={recipientEmail}
-                        onChange={(e) => {
-                          setRecipientEmail(e.target.value);
-                          setEmailError("");
-                        }}
-                        placeholder="e.g. buyer@example.com"
-                        className="w-full px-3 py-2 border border-neutral-300 text-sm focus:outline-none focus:border-[#d4a012] transition-colors"
-                      />
+                      <p className="block text-xs uppercase tracking-wider text-neutral-500 mb-1.5">
+                        Send To
+                      </p>
+                      <div className="w-full px-3 py-2 border border-neutral-200 bg-white text-sm text-neutral-700">
+                        {profile?.email || "Loading your account email..."}
+                      </div>
                     </div>
                     <div className="flex-1">
                       <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-1.5">
@@ -461,7 +450,7 @@ export default function SavedHomesPage() {
                     </button>
                     <button
                       onClick={handleSendEmail}
-                      disabled={emailSelectedIds.size === 0 || !recipientEmail.trim() || sendingEmail}
+                      disabled={emailSelectedIds.size === 0 || !profile?.email || sendingEmail}
                       className="inline-flex items-center gap-2 bg-[#d4a012] text-white px-4 py-2 text-xs uppercase tracking-wider hover:bg-[#b8890f] transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
                     >
                       {sendingEmail ? "Sending..." : "Send Email"}

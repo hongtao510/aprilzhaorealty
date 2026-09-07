@@ -21,9 +21,7 @@ create index if not exists idx_profiles_newsletter_subscribed
 create unique index if not exists idx_profiles_unsubscribe_token
   on public.profiles(unsubscribe_token);
 
--- Let authenticated users update their own profile (needed for city toggle)
+-- Preference changes go through the authenticated server API. Never grant a
+-- blanket self-update policy here: profiles also contains the authorization
+-- role and other admin-controlled fields.
 drop policy if exists "Users can update own profile" on public.profiles;
-create policy "Users can update own profile"
-  on public.profiles for update
-  using (auth.uid() = id)
-  with check (auth.uid() = id);

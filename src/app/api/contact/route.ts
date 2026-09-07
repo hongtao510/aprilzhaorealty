@@ -1,19 +1,45 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
+import { escapeHtml } from "@/lib/email-templates";
+import { checkRateLimit, requestClientIp } from "@/lib/rate-limit";
 
 interface ContactFormData {
   name: string;
   email: string;
   phone?: string;
   message: string;
+  website?: string;
 }
 
 export async function POST(request: NextRequest) {
   try {
+    const allowed = await checkRateLimit({
+      scope: "contact-form",
+      identifier: requestClientIp(request),
+      maxRequests: 5,
+      windowSeconds: 60 * 60,
+    });
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "Too many messages. Please try again later." },
+        { status: 429, headers: { "Retry-After": "3600" } }
+      );
+    }
+
     const body: ContactFormData = await request.json();
 
+    // Honeypot field: browsers leave it empty, basic form bots fill it.
+    if (body.website) {
+      return NextResponse.json({ message: "Email sent successfully" });
+    }
+
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    const email = typeof body.email === "string" ? body.email.trim() : "";
+    const phone = typeof body.phone === "string" ? body.phone.trim() : "";
+    const message = typeof body.message === "string" ? body.message.trim() : "";
+
     // Validate required fields
-    if (!body.name || !body.email || !body.message) {
+    if (!name || !email || !message) {
       return NextResponse.json(
         { error: "Name, email, and message are required" },
         { status: 400 }
@@ -22,20 +48,25 @@ export async function POST(request: NextRequest) {
 
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(body.email)) {
+    if (!emailRegex.test(email)) {
       return NextResponse.json(
         { error: "Invalid email address" },
         { status: 400 }
       );
     }
 
+    if (name.length > 120 || email.length > 254 || phone.length > 40 || message.length > 5000) {
+      return NextResponse.json(
+        { error: "One or more fields are too long" },
+        { status: 400 }
+      );
+    }
+
     // Check if Resend API key is configured
     if (!process.env.RESEND_API_KEY) {
-      console.log("Contact form submission (Resend not configured):", body);
-      // Return success for demo purposes when Resend isn't set up
       return NextResponse.json(
-        { message: "Message received! (Email service not yet configured)" },
-        { status: 200 }
+        { error: "Email service is temporarily unavailable" },
+        { status: 503 }
       );
     }
 
@@ -45,18 +76,18 @@ export async function POST(request: NextRequest) {
     const { data, error } = await resend.emails.send({
       from: "April Zhao Realty <noreply@aprilzhaohome.com>",
       to: [recipientEmail],
-      replyTo: recipientEmail,
-      subject: `New Contact Form Submission from ${body.name}`,
+      replyTo: email,
+      subject: `New Contact Form Submission from ${name.replace(/[\r\n]+/g, " ")}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #166534;">New Contact Form Submission</h2>
           <div style="background-color: #f9f9f9; padding: 20px; border-radius: 8px;">
-            <p><strong>Name:</strong> ${body.name}</p>
-            <p><strong>Email:</strong> <a href="mailto:${body.email}">${body.email}</a></p>
-            <p><strong>Phone:</strong> ${body.phone || "Not provided"}</p>
+            <p><strong>Name:</strong> ${escapeHtml(name)}</p>
+            <p><strong>Email:</strong> <a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a></p>
+            <p><strong>Phone:</strong> ${escapeHtml(phone || "Not provided")}</p>
             <p><strong>Message:</strong></p>
             <p style="background-color: white; padding: 15px; border-radius: 4px; border-left: 4px solid #166534;">
-              ${body.message.replace(/\n/g, "<br>")}
+              ${escapeHtml(message).replace(/\n/g, "<br>")}
             </p>
           </div>
           <p style="color: #666; font-size: 12px; margin-top: 20px;">

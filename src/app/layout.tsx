@@ -4,8 +4,6 @@ import { Analytics } from "@vercel/analytics/next";
 import { AgentStructuredData } from "@/components/StructuredData";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics";
 import { AuthProvider } from "@/components/auth/AuthProvider";
-import { createClient } from "@/lib/supabase/server";
-import type { Profile } from "@/lib/types";
 import "./globals.css";
 
 const inter = Inter({
@@ -58,7 +56,7 @@ export const metadata: Metadata = {
       "Your trusted real estate partner in the San Francisco Bay Area. Expert guidance for buying and selling homes with over $57M in sales volume.",
     images: [
       {
-        url: "/images/og-image.jpg",
+        url: "/images/neighborhoods/belmont.jpg",
         width: 1200,
         height: 630,
         alt: "April Zhao - Bay Area Real Estate Agent",
@@ -70,7 +68,7 @@ export const metadata: Metadata = {
     title: "April Zhao | Bay Area Real Estate Agent",
     description:
       "Your trusted real estate partner in the San Francisco Bay Area. Expert guidance for buying and selling homes.",
-    images: ["/images/og-image.jpg"],
+    images: ["/images/neighborhoods/belmont.jpg"],
     creator: "@aprilzhaohome",
   },
   robots: {
@@ -93,36 +91,15 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Hydrate AuthProvider with the SSR-resolved session so the header
-  // doesn't flash Sign In/Up while the client SDK awaits getUser().
-  let initialUser = null;
-  let initialProfile: Profile | null = null;
-  try {
-    const supabase = await createClient();
-    const { data } = await supabase.auth.getUser();
-    if (data.user) {
-      initialUser = data.user;
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", data.user.id)
-        .single();
-      initialProfile = (prof as Profile | null) ?? null;
-    }
-  } catch {
-    // Supabase unreachable — fall back to client-side init
-  }
-
   return (
     <html lang="en">
       <head>
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <meta name="theme-color" content="#d4a012" />
         <AgentStructuredData />
         <GoogleAnalytics />
@@ -130,9 +107,7 @@ export default async function RootLayout({
       <body
         className={`${inter.variable} ${playfair.variable} font-sans antialiased min-h-screen flex flex-col bg-white`}
       >
-        <AuthProvider initialUser={initialUser} initialProfile={initialProfile}>
-          {children}
-        </AuthProvider>
+        <AuthProvider>{children}</AuthProvider>
         <Analytics />
       </body>
     </html>

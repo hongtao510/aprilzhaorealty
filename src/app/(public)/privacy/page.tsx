@@ -1,9 +1,10 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/site-metadata";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "Privacy Policy",
   description: "How April Zhao Realty handles your information.",
-};
+  path: "/privacy",
+});
 
 export default function PrivacyPage() {
   return (

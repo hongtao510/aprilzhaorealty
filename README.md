@@ -12,19 +12,34 @@ A real estate website for April Zhao, Bay Area Realtor.
 ## Getting Started
 
 ```bash
-npm install
+npm ci
+cp .env.example .env.local
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to view the site.
+From another computer on the same network, open
+`http://<your-mac-mini-local-ip>:3000`. The dev server listens on all local
+network interfaces.
 
 ## Environment Variables
 
-Create a `.env.local` file with:
+Copy `.env.example` to `.env.local` and fill in the Supabase, Resend, OpenAI,
+analytics, contact-email, and cron values. `SUPABASE_SERVICE_ROLE_KEY` is
+server-only and must never use a `NEXT_PUBLIC_` prefix.
 
+For an existing Supabase project, run `supabase-security-hardening.sql` in the
+Supabase SQL Editor before deploying these changes. It removes the unsafe
+profile-update policy and installs the persistent API rate limiter.
+
+## Verification
+
+```bash
+npm run check
 ```
-RESEND_API_KEY=your_resend_api_key
-```
+
+This runs lint, TypeScript, unit tests, and the production build. Run
+`npm run audit:prod` separately to query npm's live production advisory data.
 
 ## Deployment
 

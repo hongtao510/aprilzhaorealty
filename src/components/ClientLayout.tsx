@@ -1,23 +1,10 @@
 "use client";
 
-import { Inter, Playfair_Display } from "next/font/google";
 import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-});
-
-const playfair = Playfair_Display({
-  subsets: ["latin"],
-  variable: "--font-playfair",
-});
-
-export { inter, playfair };
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -38,11 +25,6 @@ export function Header() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-
-  // Close menu on route change
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [pathname]);
 
   // Prevent body scroll when menu is open
   useEffect(() => {
@@ -77,7 +59,7 @@ export function Header() {
         <nav className="max-w-7xl mx-auto px-6 lg:px-8 h-20 flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex flex-col group z-50">
-            <div className={`${playfair.className} text-2xl font-normal tracking-wide text-neutral-900`}>
+            <div className="font-serif text-2xl font-normal tracking-wide text-neutral-900">
               <span className="text-[#d4a012]">April</span> Zhao
             </div>
             <span className="text-[10px] text-[#d4a012] tracking-[0.15em] uppercase">Expertise. Ethics. Excellence.</span>
@@ -89,6 +71,7 @@ export function Header() {
               <Link
                 key={link.href}
                 href={link.href}
+                onClick={() => setMobileMenuOpen(false)}
                 className={`text-sm font-medium uppercase tracking-widest transition-colors relative ${
                   isActive(link.href)
                     ? "text-neutral-900"
@@ -193,6 +176,7 @@ export function Header() {
               <Link
                 key={link.href}
                 href={link.href}
+                onClick={() => setMobileMenuOpen(false)}
                 className={`text-2xl font-light uppercase tracking-widest transition-all duration-300 ${
                   isActive(link.href) ? "text-[#d4a012]" : "text-neutral-900 hover:text-[#d4a012]"
                 }`}
@@ -211,6 +195,7 @@ export function Header() {
           {profile?.role === "admin" ? (
             <Link
               href="/admin"
+              onClick={() => setMobileMenuOpen(false)}
               className="mt-4 px-8 py-3 bg-[#d4a012] text-white text-sm uppercase tracking-widest hover:bg-[#b8890f] transition-all duration-300"
               style={{
                 transitionDelay: mobileMenuOpen ? `${(navLinks.length + 1) * 100}ms` : "0ms",
@@ -224,6 +209,7 @@ export function Header() {
           ) : profile || looksLoggedIn ? (
             <Link
               href="/portal"
+              onClick={() => setMobileMenuOpen(false)}
               className="mt-4 px-8 py-3 bg-[#d4a012] text-white text-sm uppercase tracking-widest hover:bg-[#b8890f] transition-all duration-300"
               style={{
                 transitionDelay: mobileMenuOpen ? `${(navLinks.length + 1) * 100}ms` : "0ms",
@@ -246,12 +232,14 @@ export function Header() {
             >
               <Link
                 href="/signup"
+                onClick={() => setMobileMenuOpen(false)}
                 className="px-8 py-3 bg-[#d4a012] text-white text-sm uppercase tracking-widest hover:bg-[#b8890f] transition-all duration-300"
               >
                 Sign Up
               </Link>
               <Link
                 href="/login"
+                onClick={() => setMobileMenuOpen(false)}
                 className="text-sm uppercase tracking-widest text-neutral-600 hover:text-neutral-900 transition-colors"
               >
                 Sign In
@@ -293,7 +281,7 @@ export function Footer() {
         <div className="grid md:grid-cols-4 gap-12">
           {/* Brand Column */}
           <div className="md:col-span-2">
-            <div className={`${playfair.className} text-3xl font-normal mb-2`}>
+            <div className="font-serif text-3xl font-normal mb-2">
               <span className="text-[#d4a012]">April</span> Zhao
             </div>
             <p className="text-[#d4a012] text-xs tracking-[0.2em] uppercase mb-6">Expertise. Ethics. Excellence.</p>

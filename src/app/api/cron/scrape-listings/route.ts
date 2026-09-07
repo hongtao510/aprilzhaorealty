@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { scrapeAllCities, type RedfinListing } from "@/lib/redfin-listings";
+import { scrapeAllCities } from "@/lib/redfin-listings";
+import { isAuthorizedCronRequest } from "@/lib/cron-auth";
+import { citiesSafeToStaleMark } from "@/lib/listing-scrape-policy";
+import { buildListingUpsertRow } from "@/lib/listing-upsert";
 import { buildSubscriberDigestHtml, type DigestListing, escapeHtml } from "@/lib/email-templates";
 import {
   PRICE_RANGE_BUCKETS,
@@ -24,7 +27,7 @@ export const maxDuration = 60;
 export async function GET(request: NextRequest) {
   // Verify cron secret (Vercel sets this header for cron jobs)
   const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isAuthorizedCronRequest(authHeader, process.env.CRON_SECRET)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -71,10 +74,17 @@ export async function GET(request: NextRequest) {
   const existingUrls = new Set<string>();
   for (let i = 0; i < allUrls.length; i += 50) {
     const chunk = allUrls.slice(i, i + 50);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("redfin_listings")
       .select("redfin_url")
       .in("redfin_url", chunk);
+    if (error) {
+      log(`Existing-listing lookup failed: ${error.message}`);
+      return NextResponse.json(
+        { error: "Unable to verify existing listings", logs },
+        { status: 500 }
+      );
+    }
     if (data) data.forEach((row) => existingUrls.add(row.redfin_url));
   }
 
@@ -85,37 +95,18 @@ export async function GET(request: NextRequest) {
   // Build full rows for upsert — all required columns included
   const rows = allListings
     .filter((l) => l.redfin_url)
-    .map((listing) => ({
-      redfin_url: listing.redfin_url,
-      address: listing.address,
-      city: listing.city,
-      state: listing.state,
-      zip: listing.zip,
-      price: listing.price,
-      beds: listing.beds,
-      baths: listing.baths,
-      sqft: listing.sqft,
-      lot_sqft: listing.lot_sqft,
-      year_built: listing.year_built,
-      price_per_sqft: listing.price_per_sqft,
-      hoa_per_month: listing.hoa_per_month,
-      property_type: listing.property_type,
-      status: listing.status,
-      days_on_market: listing.days_on_market,
-      mls_number: listing.mls_number,
-      latitude: listing.latitude,
-      longitude: listing.longitude,
-      first_seen_at: now,
-      last_seen_at: now,
-      is_new: !existingUrls.has(listing.redfin_url),
-    }));
+    .map((listing) => buildListingUpsertRow(listing, existingUrls, now));
 
   // Batch upsert all listings in chunks of 50
   for (let i = 0; i < rows.length; i += 50) {
     const chunk = rows.slice(i, i + 50);
     const { error } = await supabase
       .from("redfin_listings")
-      .upsert(chunk, { onConflict: "redfin_url", ignoreDuplicates: false });
+      .upsert(chunk, {
+        onConflict: "redfin_url",
+        ignoreDuplicates: false,
+        defaultToNull: false,
+      });
     if (error) {
       totalErrors += chunk.length;
       log(`Upsert error (batch ${Math.floor(i / 50)}): ${error.message}`);
@@ -126,26 +117,46 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  for (const { city, listings } of cityResults) {
-    log(`${city}: ${listings.length} listings`);
+  for (const { city, listings, success, error } of cityResults) {
+    log(
+      success
+        ? `${city}: ${listings.length} listings`
+        : `${city}: scrape failed (${error ?? "unknown error"})`
+    );
   }
 
-  // 4. Mark listings not seen today as potentially off-market
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const { data: staleListings } = await supabase
-    .from("redfin_listings")
-    .select("id")
-    .eq("status", "active")
-    .lt("last_seen_at", today.toISOString());
+  // 4. Only stale-mark cities with a successful, non-empty scrape, and only
+  // after every upsert succeeded. A Redfin outage must never remove inventory.
+  const safeCities = citiesSafeToStaleMark(cityResults, totalErrors);
 
-  if (staleListings && staleListings.length > 0) {
-    const staleIds = staleListings.map((l) => l.id);
-    await supabase
+  if (totalErrors === 0 && safeCities.length > 0) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const { data: staleListings, error: staleLookupError } = await supabase
       .from("redfin_listings")
-      .update({ status: "off-market" })
-      .in("id", staleIds);
-    log(`Marked ${staleIds.length} listings as off-market (not seen today)`);
+      .select("id")
+      .eq("status", "active")
+      .in("city", safeCities)
+      .lt("last_seen_at", today.toISOString());
+
+    if (staleLookupError) {
+      totalErrors += 1;
+      log(`Skipped off-market update: ${staleLookupError.message}`);
+    } else if (staleListings && staleListings.length > 0) {
+      const staleIds = staleListings.map((listing) => listing.id);
+      const { error: staleUpdateError } = await supabase
+        .from("redfin_listings")
+        .update({ status: "off-market" })
+        .in("id", staleIds);
+      if (staleUpdateError) {
+        totalErrors += staleIds.length;
+        log(`Off-market update failed: ${staleUpdateError.message}`);
+      } else {
+        log(`Marked ${staleIds.length} listings as off-market (not seen today)`);
+      }
+    }
+  } else {
+    log("Skipped off-market update because scrape/upsert coverage was incomplete");
   }
 
   log(`Done! New: ${totalNew}, Updated: ${totalUpdated}, Errors: ${totalErrors}`);
