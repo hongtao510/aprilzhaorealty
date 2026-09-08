@@ -32,7 +32,8 @@ begin
 end;
 $$;
 
-revoke all on function public.protect_profile_privileged_fields() from public;
+revoke all on function public.protect_profile_privileged_fields()
+  from public, anon, authenticated;
 
 drop trigger if exists protect_profile_privileged_fields on public.profiles;
 create trigger protect_profile_privileged_fields
@@ -50,6 +51,12 @@ create table if not exists public.api_rate_limits (
 
 alter table public.api_rate_limits enable row level security;
 
+-- The limiter is called only by server-side code using the service role. Keep
+-- both table access and RPC execution unavailable to browser-facing roles.
+revoke all privileges on table public.api_rate_limits
+  from public, anon, authenticated;
+grant select, insert, update on table public.api_rate_limits to service_role;
+
 create or replace function public.check_rate_limit(
   p_key text,
   p_window_seconds integer,
@@ -57,8 +64,8 @@ create or replace function public.check_rate_limit(
 )
 returns boolean
 language plpgsql
-security definer
-set search_path = public, pg_temp
+security invoker
+set search_path = ''
 as $$
 declare
   accepted boolean;
@@ -95,5 +102,6 @@ begin
 end;
 $$;
 
-revoke all on function public.check_rate_limit(text, integer, integer) from public;
+revoke all on function public.check_rate_limit(text, integer, integer)
+  from public, anon, authenticated;
 grant execute on function public.check_rate_limit(text, integer, integer) to service_role;
